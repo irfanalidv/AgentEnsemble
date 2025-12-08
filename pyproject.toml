@@ -1,0 +1,118 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentensemble"
+version = "0.1.0"
+description = "Orchestrate AI agents in perfect harmony - A comprehensive Python framework for building, testing, and orchestrating multi-agent AI systems"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "Irfan Ali", email = "irfanali29@hotmail.com"}
+]
+maintainers = [
+    {name = "Irfan Ali", email = "irfanali29@hotmail.com"}
+]
+keywords = [
+    "ai-agents",
+    "multi-agent",
+    "orchestration",
+    "langgraph",
+    "langchain",
+    "rag",
+    "agent-testing",
+    "agentic-ai",
+    "state-graph",
+    "react-agent"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+license = {text = "MIT"}
+
+dependencies = [
+    "langchain>=0.1.0",  # Structured output requires langchain>=1.1 (optional)
+    "langchain-core>=0.1.0",
+    "langchain-community>=0.0.20",
+    "langchain-mistralai>=0.1.0",
+    "langgraph>=0.0.20",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.5.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pytest-cov>=4.0.0",
+]
+observability = [
+    "langsmith>=0.1.0",
+    "opentelemetry-api>=1.20.0",
+]
+rag = [
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+    "langchain-text-splitters>=0.0.1",
+    "beautifulsoup4>=4.12.0",
+    "langchain-mistralai>=0.1.0",
+]
+search = [
+    "duckduckgo-search>=4.0.0",  # Fallback search option
+    "google-search-results>=2.4.2",  # Serper API (default if API key provided)
+]
+all = [
+    "agentensemble[dev,observability,rag,search]",
+]
+
+[project.urls]
+Homepage = "https://github.com/irfanalidv/AgentEnsemble"
+Documentation = "https://github.com/irfanalidv/AgentEnsemble#readme"
+Repository = "https://github.com/irfanalidv/AgentEnsemble"
+Issues = "https://github.com/irfanalidv/AgentEnsemble/issues"
+
+[tool.setuptools]
+packages = ["agentensemble", "agentensemble.agents", "agentensemble.orchestration", "agentensemble.tools", "agentensemble.testing", "agentensemble.utils"]
+license-files = []
+
+[tool.setuptools.package-data]
+agentensemble = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+

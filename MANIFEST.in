@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+recursive-include agentensemble *.py
+recursive-include agentensemble py.typed
+exclude LICENSE
+

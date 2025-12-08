@@ -1,0 +1,32 @@
+# Core dependencies
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+langchain-mistralai>=0.1.0
+langgraph>=0.0.20
+pydantic>=2.0.0
+typing-extensions>=4.5.0
+python-dotenv>=1.0.0
+
+# Optional: Search tools (open-source, free)
+# duckduckgo-search>=4.0.0  # Free, open-source search (default)
+# google-search-results>=2.4.2  # Only if using Serper API (optional)
+
+# Optional: Observability
+# langsmith>=0.1.0
+# opentelemetry-api>=1.20.0
+
+# Optional: RAG
+# chromadb>=0.4.0
+# sentence-transformers>=2.2.0
+# langchain-text-splitters>=0.0.1
+# beautifulsoup4>=4.12.0
+
+# Development dependencies (install with: pip install -e ".[dev]")
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# ruff>=0.1.0
+# mypy>=1.0.0
+# pytest-cov>=4.0.0
+
