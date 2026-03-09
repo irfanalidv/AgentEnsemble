@@ -85,7 +85,7 @@ Repository = "https://github.com/irfanalidv/AgentEnsemble"
 Issues = "https://github.com/irfanalidv/AgentEnsemble/issues"
 
 [tool.setuptools]
-packages = ["agentensemble", "agentensemble.agents", "agentensemble.orchestration", "agentensemble.tools", "agentensemble.testing", "agentensemble.utils"]
+packages = ["agentensemble", "agentensemble.agents", "agentensemble.orchestration", "agentensemble.tools", "agentensemble.testing", "agentensemble.utils", "agentensemble.llm", "agentensemble.memory", "agentensemble.core", "agentensemble.router", "agentensemble.planner", "agentensemble.graph", "agentensemble.tracing"]
 license-files = []
 
 [tool.setuptools.package-data]

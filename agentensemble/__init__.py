@@ -28,14 +28,18 @@ from agentensemble.orchestration import (
     SupervisorOrchestrator,
     SwarmOrchestrator,
     PipelineOrchestrator,
+    DebateOrchestrator,
 )
 
+from agentensemble.memory import Session, InMemorySession, SQLiteSession
 from agentensemble.tools import (
     ToolRegistry,
     SearchTool,
     ScraperTool,
     RAGTool,
     ValidationTool,
+    FunctionTool,
+    function_tool,
 )
 
 from agentensemble.testing import (
@@ -43,6 +47,12 @@ from agentensemble.testing import (
     Benchmark,
     Metrics,
 )
+from agentensemble.runner import Runner, RunConfig, RunHooks
+from agentensemble.core import AgentProtocol
+from agentensemble.router import RouterAgent
+from agentensemble.planner import PlannerAgent
+from agentensemble.graph import WorkflowGraph, Node, Edge
+from agentensemble.tracing import TraceHooks, TraceEvent
 
 __all__ = [
     # Version
@@ -58,16 +68,39 @@ __all__ = [
     "SupervisorOrchestrator",
     "SwarmOrchestrator",
     "PipelineOrchestrator",
+    "DebateOrchestrator",
+    # Memory
+    "Session",
+    "InMemorySession",
+    "SQLiteSession",
     # Tools
     "ToolRegistry",
     "SearchTool",
     "ScraperTool",
     "RAGTool",
     "ValidationTool",
+    "FunctionTool",
+    "function_tool",
     # Testing
     "AgentComparison",
     "Benchmark",
     "Metrics",
+    # Runner
+    "Runner",
+    "RunConfig",
+    "RunHooks",
+    # Core
+    "AgentProtocol",
+    # Router & Planner
+    "RouterAgent",
+    "PlannerAgent",
+    # Graph
+    "WorkflowGraph",
+    "Node",
+    "Edge",
+    # Tracing
+    "TraceHooks",
+    "TraceEvent",
 ]
 
 # Add StructuredAgent if available

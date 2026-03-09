@@ -9,6 +9,7 @@ Provides production-ready agent architectures:
 - StructuredAgent: Structured output support (langchain>=1.1 or with_structured_output)
 """
 
+from agentensemble.agents.base import BaseAgent, AgentState
 from agentensemble.agents.react_agent import ReActAgent
 from agentensemble.agents.stategraph_agent import StateGraphAgent
 from agentensemble.agents.rag_agent import RAGAgent
@@ -22,6 +23,8 @@ except ImportError:
     StructuredAgent = None
 
 __all__ = [
+    "BaseAgent",
+    "AgentState",
     "ReActAgent",
     "StateGraphAgent",
     "RAGAgent",

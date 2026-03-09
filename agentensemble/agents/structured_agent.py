@@ -5,9 +5,11 @@ Agent with structured output support using LangChain's structured output feature
 Supports both langchain>=1.1 (create_agent with response_format) and 
 langchain<1.1 (with_structured_output method).
 
+Provides run() and arun() for API consistency with BaseAgent.
 Based on: https://docs.langchain.com/oss/python/langchain/structured-output
 """
 
+import asyncio
 from typing import Any, Dict, Optional, Type, Union
 from pydantic import BaseModel
 
@@ -191,7 +193,13 @@ class StructuredAgent:
         
         else:
             raise ValueError(f"Unknown method: {self._method}")
-    
+
+    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Execute agent asynchronously (same result as run).
+        """
+        return await asyncio.to_thread(self.run, query, **kwargs)
+
     def invoke(self, input: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
         Direct invoke method for compatibility with LangChain agents.

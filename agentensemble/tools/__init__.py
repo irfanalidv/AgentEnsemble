@@ -10,6 +10,8 @@ from agentensemble.tools.search import SearchTool
 from agentensemble.tools.scraper import ScraperTool
 from agentensemble.tools.rag import RAGTool
 from agentensemble.tools.validator import ValidationTool
+from agentensemble.tools.function_tool import FunctionTool, function_tool
+from agentensemble.tools.adapters import get_tool_schemas, invoke_tool, ainvoke_tool
 
 __all__ = [
     "ToolRegistry",
@@ -17,4 +19,9 @@ __all__ = [
     "ScraperTool",
     "RAGTool",
     "ValidationTool",
+    "FunctionTool",
+    "function_tool",
+    "get_tool_schemas",
+    "invoke_tool",
+    "ainvoke_tool",
 ]
