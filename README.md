@@ -23,25 +23,43 @@ AgentEnsemble is a modern framework for building and orchestrating AI agent syst
 ## Architecture
 
 <p align="center">
-  <img src="docs/agentensemble-architecture.png" alt="AgentEnsemble Architecture" width="800"/>
+  <img src="docs/agentensemble-architecture.png" alt="AgentEnsemble Architecture" width="900"/>
 </p>
 
-*Architecture, functionalities, and use cases — what AgentEnsemble is capable of.*
+### Framework layers
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        AgentEnsemble                             │
-├─────────────┬─────────────┬─────────────┬───────────────────────┤
-│   Agents    │ Orchestration│   Tools     │ Memory & Runner       │
-├─────────────┼─────────────┼─────────────┼───────────────────────┤
-│ ReActAgent  │ Ensemble    │ SearchTool  │ Session (InMemory,    │
-│ StateGraph  │ Supervisor  │ RAGTool     │ SQLite)               │
-│ RAGAgent    │ Swarm       │ @function_  │ Runner + RunConfig    │
-│ HybridAgent │ Pipeline    │ tool        │ TraceHooks            │
-│ RouterAgent │ Debate      │ Validation  │                       │
-│ PlannerAgent│             │             │                       │
-└─────────────┴─────────────┴─────────────┴───────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                              AgentEnsemble — Layered Architecture                          │
+├─────────────────┬─────────────────────┬─────────────────────┬────────────────────────────┤
+│     AGENTS      │   ORCHESTRATION      │       TOOLS         │    MEMORY & RUNNER          │
+├─────────────────┼─────────────────────┼─────────────────────┼────────────────────────────┤
+│ ReActAgent      │ Supervisor          │ SearchTool          │ Session (InMemory, SQLite)  │
+│ StateGraphAgent │ Swarm (parallel)    │ RAGTool             │ RunConfig, RunHooks        │
+│ RAGAgent        │ Pipeline (seq)     │ @function_tool      │ TraceHooks (usage, cost)    │
+│ HybridAgent     │ Debate (consensus)  │ ValidationTool      │ interrupt_before_tools      │
+│ RouterAgent     │ Ensemble + Router   │ ToolRegistry         │ retries, session memory     │
+│ PlannerAgent    │ WorkflowGraph       │                     │                             │
+└─────────────────┴─────────────────────┴─────────────────────┴────────────────────────────┘
+         │                    │                    │                         │
+         └────────────────────┴────────────────────┴─────────────────────────┘
+                                          │
+                              ┌───────────▼───────────┐
+                              │   Use Case Spectrum   │
+                              └───────────────────────┘
 ```
+
+### Use case spectrum
+
+| Layer | Use cases |
+|-------|-----------|
+| **Research & fact-checking** | ReActAgent + SearchTool; Swarm for parallel verification |
+| **Document Q&A** | RAGAgent + RAGTool; index URLs, ask questions |
+| **Multi-agent coordination** | Supervisor, Swarm, Pipeline; RouterAgent for LLM-based selection |
+| **Debate & consensus** | DebateOrchestrator; solvers propose → aggregator votes |
+| **Custom workflows** | WorkflowGraph (DAG), StateGraphAgent (nodes), PlannerAgent (decompose) |
+| **Human-in-loop** | `interrupt_before_tools` — pause before sensitive tools, resume with approval |
+| **Production pipelines** | Runner + RunConfig, retries, TraceHooks (usage/cost), Session memory |
 
 ---
 
@@ -314,7 +332,65 @@ Runner.run(agent, "What about its population?", config=config)  # Remembers cont
 
 ---
 
-### 11. RAGAgent — Document Q&A (optional: `pip install agentensemble[rag]`)
+### 11. TraceHooks — Observability, token usage, cost estimation
+
+```python
+from agentensemble import ReActAgent, Runner, RunConfig, TraceHooks, SearchTool
+
+agent = ReActAgent(name="research", tools=[SearchTool()], max_iterations=3)
+hooks = TraceHooks()
+
+config = RunConfig(trace_hooks=hooks)
+result = Runner.run(agent, "Who won the 2024 Nobel Prize in Physics?", config=config)
+
+print(result["result"][:100], "...")
+print("Usage:", result["metadata"].get("total_usage"))
+print("Cost (USD):", result["metadata"].get("cost_usd"))
+print("Events:", [e.type.value for e in hooks.events])
+```
+
+**Output:**
+
+```
+The 2024 Nobel Prize in Physics was awarded jointly to John J. Hopfield and Geoffrey E. Hinton...
+Usage: {'input_tokens': 1247, 'output_tokens': 89, 'total_tokens': 1336}
+Cost (USD): 0.00293
+Events: ['run_start', 'llm_start', 'llm_end', 'tool_start', 'tool_end', 'llm_start', 'llm_end', 'run_end']
+```
+
+---
+
+### 12. Human-in-loop — Pause before sensitive tools, resume with approval
+
+```python
+from agentensemble import ReActAgent, Runner, RunConfig, function_tool
+
+@function_tool(description="Execute a payment")
+def execute_payment(amount: float, recipient: str) -> str:
+    return f"Paid ${amount} to {recipient}"
+
+agent = ReActAgent(tools=[execute_payment], max_iterations=2)
+config = RunConfig(interrupt_before_tools=["execute_payment"])
+
+result = Runner.run(agent, "Pay $50 to Alice", config=config)
+
+if result.get("__interrupted__"):
+    print("Paused for approval:", result["pending_tool"])
+    # Simulate human approval
+    result = Runner.run(agent, "...", config=config, resume=result["run_state"], resume_value="Paid $50 to Alice")
+print(result["result"])
+```
+
+**Output:**
+
+```
+Paused for approval: {'name': 'execute_payment', 'arguments': {'amount': 50.0, 'recipient': 'Alice'}}
+Paid $50 to Alice
+```
+
+---
+
+### 13. RAGAgent — Document Q&A (optional: `pip install agentensemble[rag]`)
 
 ```python
 from agentensemble import RAGAgent, RAGTool
@@ -335,7 +411,7 @@ manageable subtasks that can be executed by specialized agents...
 
 ---
 
-### 12. StructuredAgent — Pydantic output (optional: `langchain>=1.1`)
+### 14. StructuredAgent — Pydantic output (optional: `langchain>=1.1`)
 
 ```python
 from pydantic import BaseModel, Field
@@ -416,7 +492,7 @@ pip install agentensemble[search]
 PYTHONPATH=. python examples/showcase_all.py
 ```
 
-Runs all 10 demos with real API calls.
+Runs all demos with real API calls.
 
 ---
 
@@ -454,7 +530,8 @@ Runs all 10 demos with real API calls.
 
 - **Session** — `InMemorySession`, `SQLiteSession` for multi-turn context
 - **Runner** — `Runner.run()`, `Runner.arun()` with `RunConfig`, `RunHooks`, retries
-- **TraceHooks** — Observability for runs, LLM calls, tools
+- **TraceHooks** — Observability: run/LLM/tool events, token usage, cost estimation
+- **Human-in-loop** — `interrupt_before_tools=["pay", "send_email"]` to pause for approval
 
 ---
 
@@ -489,7 +566,8 @@ agentensemble/
 | Graph workflows    | WorkflowGraph, StateGraph | Native       | No     | No      |
 | Debate pattern     | DebateOrchestrator        | Manual       | Yes    | Yes     |
 | Session memory     | InMemory, SQLite          | Checkpointer | No     | No      |
-| Observability      | TraceHooks                | LangSmith    | No     | No      |
+| Observability      | TraceHooks, usage, cost   | LangSmith    | No     | No      |
+| Human-in-loop     | interrupt_before_tools    | interrupt()  | No     | No      |
 
 ---
 
@@ -497,7 +575,8 @@ agentensemble/
 
 - **Retries**: `RunConfig(max_retries=2, retry_on=(RateLimitError, TimeoutError))`
 - **Session**: `Runner.run(agent, query, config=RunConfig(session=SQLiteSession()))`
-- **Tracing**: Attach `TraceHooks` to capture run/LLM/tool events
+- **Tracing**: `RunConfig(trace_hooks=TraceHooks())` — captures run/LLM/tool events, usage, cost
+- **Human-in-loop**: `RunConfig(interrupt_before_tools=["pay"])` — pause before sensitive tools; resume with `Runner.run(agent, ..., resume=run_state, resume_value="Approved")`
 - **Benchmarks**: `AgentComparison`, `Benchmark.research_tasks()`, `Metrics`
 
 ---

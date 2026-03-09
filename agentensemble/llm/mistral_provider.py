@@ -82,10 +82,31 @@ def _messages_to_langchain(messages: List[LLMMessage]) -> List["BaseMessage"]:
     return result
 
 
+def _extract_usage(msg: "AIMessage") -> Optional[Dict[str, int]]:
+    """Extract token usage from LangChain AIMessage (usage_metadata or response_metadata)."""
+    um = getattr(msg, "usage_metadata", None)
+    if um and isinstance(um, dict):
+        return {
+            "input_tokens": um.get("input_tokens", 0),
+            "output_tokens": um.get("output_tokens", 0),
+            "total_tokens": um.get("total_tokens", 0),
+        }
+    rm = getattr(msg, "response_metadata", None) or {}
+    usage = rm.get("usage") or rm.get("usage_metadata") or {}
+    if usage:
+        return {
+            "input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
+            "output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+    return None
+
+
 def _parse_ai_message(msg: AIMessage) -> LLMResponse:
     """Extract LLMResponse from LangChain AIMessage."""
     content = msg.content if isinstance(msg.content, str) else ""
     tool_calls: List[ToolCall] = []
+    usage = _extract_usage(msg)
 
     if hasattr(msg, "tool_calls") and msg.tool_calls:
         for tc in msg.tool_calls:
@@ -114,6 +135,7 @@ def _parse_ai_message(msg: AIMessage) -> LLMResponse:
         content=content or None,
         tool_calls=tool_calls,
         finish_reason="tool_calls" if tool_calls else "stop",
+        usage=usage,
     )
 
 

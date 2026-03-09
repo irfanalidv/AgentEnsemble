@@ -6,9 +6,12 @@ Unified execution with RunConfig, hooks, and error handling.
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
 from agentensemble.memory import Session
+
+if TYPE_CHECKING:
+    from agentensemble.tracing import TraceHooks
 
 
 @runtime_checkable
@@ -36,6 +39,8 @@ class RunConfig:
 
     session: Optional[Session] = None
     hooks: Optional[RunHooks] = None
+    trace_hooks: Optional["TraceHooks"] = None
+    interrupt_before_tools: Optional[List[str]] = None
     max_retries: int = 0
     retry_on: tuple = (Exception,)  # Exception types to retry (e.g. (RateLimitError, TimeoutError))
     context: Dict[str, Any] = field(default_factory=dict)
@@ -90,6 +95,7 @@ class Runner:
         """
         config = config or RunConfig()
         merged_kwargs = {**config.context, **kwargs}
+        merged_kwargs["run_config"] = config
         if config.session and hasattr(agent, "session"):
             merged_kwargs.setdefault("session", config.session)
         elif config.session:

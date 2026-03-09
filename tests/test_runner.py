@@ -38,6 +38,19 @@ class TestRunner:
         result = Runner.run(agent, "q", config=config)
         assert result["result"] == "mock: q"
 
+    def test_run_passes_run_config_to_agent(self):
+        received = []
+
+        class CapturingAgent(MockAgent):
+            async def arun(self, query: str, **kwargs):
+                received.append(kwargs.get("run_config"))
+                return {"result": f"mock: {query}", "metadata": {}}
+
+        config = RunConfig(context={"x": 1})
+        Runner.run(CapturingAgent(), "q", config=config)
+        assert len(received) == 1
+        assert received[0] is config
+
     def test_run_with_hooks(self):
         agent = MockAgent()
         started = []
@@ -80,3 +93,11 @@ class TestRunConfig:
         config = RunConfig(max_retries=2, context={"x": 1})
         assert config.max_retries == 2
         assert config.context["x"] == 1
+
+    def test_config_trace_hooks_and_interrupt(self):
+        from agentensemble.tracing import TraceHooks
+
+        hooks = TraceHooks()
+        config = RunConfig(trace_hooks=hooks, interrupt_before_tools=["pay"])
+        assert config.trace_hooks is hooks
+        assert config.interrupt_before_tools == ["pay"]

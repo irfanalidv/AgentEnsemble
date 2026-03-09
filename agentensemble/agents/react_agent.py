@@ -10,11 +10,21 @@ Research basis:
 """
 
 import asyncio
+import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from agentensemble.agents.base import BaseAgent, AgentState
 from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolCall
 from agentensemble.tools.adapters import get_tool_schemas, ainvoke_tool
+
+try:
+    from agentensemble.tracing import TraceEventType, TraceEvent, estimate_cost
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+    TraceEventType = None
+    TraceEvent = None
+    estimate_cost = None
 
 try:
     from agentensemble.llm.mistral_provider import MistralLLMProvider
@@ -213,6 +223,35 @@ class ReActAgent(BaseAgent):
             raw.append(d)
         self.session.add_messages(raw)
 
+    def _messages_to_dicts(self, msgs: List[LLMMessage]) -> List[Dict[str, Any]]:
+        """Serialize messages for run_state (human-in-loop resume)."""
+        out = []
+        for m in msgs:
+            d: Dict[str, Any] = {"role": m.role, "content": m.content if isinstance(m.content, str) else ""}
+            if m.tool_call_id:
+                d["tool_call_id"] = m.tool_call_id
+            if m.tool_calls:
+                d["tool_calls"] = [{"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls]
+            out.append(d)
+        return out
+
+    def _dicts_to_messages(self, raw: List[Dict[str, Any]]) -> List[LLMMessage]:
+        """Deserialize messages from run_state."""
+        out: List[LLMMessage] = []
+        for m in raw:
+            tc = None
+            if m.get("tool_calls"):
+                tc = [ToolCall(id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {})) for x in m["tool_calls"]]
+            out.append(
+                LLMMessage(
+                    role=m["role"],
+                    content=m.get("content", ""),
+                    tool_call_id=m.get("tool_call_id"),
+                    tool_calls=tc,
+                )
+            )
+        return out
+
     async def _run_loop(self, query: str, **kwargs: Any) -> Dict[str, Any]:
         """Async ReAct loop: Reason -> Act -> Observe until final answer."""
         if self.llm is None:
@@ -221,25 +260,52 @@ class ReActAgent(BaseAgent):
                 "or pass llm=YourLLMProvider()."
             )
 
-        state = AgentState(query=query, context=kwargs.get("context", {}))
+        run_config = kwargs.get("run_config")
+        trace_hooks = getattr(run_config, "trace_hooks", None) if run_config else None
+        interrupt_tools = getattr(run_config, "interrupt_before_tools", None) or []
+        resume_state = kwargs.get("resume")
+        resume_value = kwargs.get("resume_value")
+
+        if resume_state and resume_value is not None:
+            messages = self._dicts_to_messages(resume_state["messages"])
+            state = AgentState(**resume_state["state"])
+            pending = resume_state["pending_tc"]
+            messages.append(
+                LLMMessage(role="tool", content=str(resume_value), tool_call_id=pending.get("id", ""))
+            )
+            state = self._update_state(state, tool_calls=[{"name": pending.get("name", ""), "result": str(resume_value)}])
+        else:
+            state = AgentState(query=query, context=kwargs.get("context", {}))
+            history = self._session_to_messages()
+            messages = [
+                LLMMessage(role="system", content=""),
+                *history,
+                LLMMessage(role="user", content=query),
+            ]
+            system_prompt = self.llm.get_react_system_prompt(
+                get_tool_schemas(self.tools) if self.tools else [],
+                self.max_iterations,
+            )
+            messages[0] = LLMMessage(role="system", content=system_prompt)
+
         tool_schemas = get_tool_schemas(self.tools) if self.tools else []
         tool_map = {t.name: t for t in self.tools} if self.tools else {}
+        history_len = len(self._session_to_messages())
+        total_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
-        system_prompt = self.llm.get_react_system_prompt(tool_schemas, self.max_iterations)
-        history = self._session_to_messages()
-        messages: List[LLMMessage] = [
-            LLMMessage(role="system", content=system_prompt),
-            *history,
-            LLMMessage(role="user", content=query),
-        ]
+        if trace_hooks and TRACING_AVAILABLE:
+            trace_hooks.emit(TraceEvent(type=TraceEventType.RUN_START, agent=self.name, data={"query": query[:200]}))
 
         for iteration in range(self.max_iterations):
             if not self._validate_state(state):
                 break
 
-            # After tool results, omit tools to encourage final answer
             has_tool_results = any(m.role == "tool" for m in messages)
             use_tools = tool_schemas and not has_tool_results
+
+            llm_start = time.perf_counter()
+            if trace_hooks and TRACING_AVAILABLE:
+                trace_hooks.emit(TraceEvent(type=TraceEventType.LLM_START, agent=self.name, data={}))
 
             response = await self.llm.agenerate(
                 messages,
@@ -247,17 +313,46 @@ class ReActAgent(BaseAgent):
                 tool_choice="auto" if use_tools else None,
             )
 
-            if response.tool_calls:
-                # Append assistant message with tool_calls (required for multi-turn)
-                messages.append(
-                    LLMMessage(
-                        role="assistant",
-                        content=response.content or "",
-                        tool_calls=response.tool_calls,
+            if response.usage:
+                for k in total_usage:
+                    total_usage[k] = total_usage.get(k, 0) + response.usage.get(k, 0)
+            if trace_hooks and TRACING_AVAILABLE:
+                llm_data: Dict[str, Any] = {}
+                if response.usage:
+                    llm_data["usage"] = response.usage
+                    if estimate_cost:
+                        model = getattr(self.llm, "model_name", "mistral-large-latest")
+                        llm_data["cost_usd"] = estimate_cost(response.usage, model=model)
+                trace_hooks.emit(
+                    TraceEvent(
+                        type=TraceEventType.LLM_END,
+                        agent=self.name,
+                        data=llm_data,
+                        duration_ms=(time.perf_counter() - llm_start) * 1000,
                     )
                 )
-                # Execute each tool and append results (preserve tool_call id for matching)
+
+            if response.tool_calls:
+                messages.append(
+                    LLMMessage(role="assistant", content=response.content or "", tool_calls=response.tool_calls)
+                )
                 for tc in response.tool_calls:
+                    if interrupt_tools and tc.name in interrupt_tools:
+                        run_state = {
+                            "messages": self._messages_to_dicts(messages),
+                            "state": state.model_dump(),
+                            "pending_tc": {"id": tc.id or f"call_{tc.name}", "name": tc.name, "arguments": tc.arguments},
+                        }
+                        return {
+                            "__interrupted__": True,
+                            "run_state": run_state,
+                            "pending_tool": {"name": tc.name, "arguments": tc.arguments},
+                        }
+
+                    tool_start = time.perf_counter()
+                    if trace_hooks and TRACING_AVAILABLE:
+                        trace_hooks.emit(TraceEvent(type=TraceEventType.TOOL_START, agent=self.name, data={"tool": tc.name}))
+
                     tool = tool_map.get(tc.name)
                     if tool:
                         try:
@@ -268,33 +363,50 @@ class ReActAgent(BaseAgent):
                     else:
                         result_str = f"Tool '{tc.name}' not found"
 
-                    messages.append(
-                        LLMMessage(
-                            role="tool",
-                            content=result_str,
-                            tool_call_id=tc.id or f"call_{tc.name}",
+                    if trace_hooks and TRACING_AVAILABLE:
+                        trace_hooks.emit(
+                            TraceEvent(
+                                type=TraceEventType.TOOL_END,
+                                agent=self.name,
+                                data={"tool": tc.name, "result_preview": result_str[:100]},
+                                duration_ms=(time.perf_counter() - tool_start) * 1000,
+                            )
                         )
+
+                    messages.append(
+                        LLMMessage(role="tool", content=result_str, tool_call_id=tc.id or f"call_{tc.name}")
                     )
-                    state = self._update_state(
-                        state,
-                        tool_calls=[{"name": tc.name, "result": result_str}],
-                    )
+                    state = self._update_state(state, tool_calls=[{"name": tc.name, "result": result_str}])
             else:
-                # Final answer
                 state.result = response.content or state.result
                 break
 
-        # Persist to session (user + assistant/tool messages from this turn)
         if self.session:
-            to_save = messages[len(history) + 2:]  # Skip system, history; keep user + new
+            to_save = messages[history_len + 2:]
             if to_save:
                 self._messages_to_session(to_save)
 
+        metadata: Dict[str, Any] = {
+            "iterations": state.iteration_count,
+            "tool_calls": len(state.tool_calls),
+            "agent": self.name,
+        }
+        if total_usage.get("total_tokens"):
+            metadata["total_usage"] = total_usage
+            if estimate_cost:
+                model = getattr(self.llm, "model_name", "mistral-large-latest")
+                metadata["cost_usd"] = estimate_cost(total_usage, model=model)
+
+        if trace_hooks and TRACING_AVAILABLE:
+            trace_hooks.emit(
+                TraceEvent(
+                    type=TraceEventType.RUN_END,
+                    agent=self.name,
+                    data={"query": query[:200], "usage": total_usage, "result_preview": str(state.result or "")[:200]},
+                )
+            )
+
         return {
             "result": state.result or "No result generated",
-            "metadata": {
-                "iterations": state.iteration_count,
-                "tool_calls": len(state.tool_calls),
-                "agent": self.name,
-            },
+            "metadata": metadata,
         }

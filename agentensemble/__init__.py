@@ -4,7 +4,7 @@ AgentEnsemble - Orchestrate AI agents in perfect harmony
 A comprehensive framework for building, testing, and orchestrating multi-agent AI systems.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "Irfan Ali"
 
 # Core imports
@@ -52,7 +52,7 @@ from agentensemble.core import AgentProtocol
 from agentensemble.router import RouterAgent
 from agentensemble.planner import PlannerAgent
 from agentensemble.graph import WorkflowGraph, Node, Edge
-from agentensemble.tracing import TraceHooks, TraceEvent
+from agentensemble.tracing import TraceHooks, TraceEvent, TraceEventType, estimate_cost
 
 __all__ = [
     # Version
@@ -101,6 +101,8 @@ __all__ = [
     # Tracing
     "TraceHooks",
     "TraceEvent",
+    "TraceEventType",
+    "estimate_cost",
 ]
 
 # Add StructuredAgent if available
