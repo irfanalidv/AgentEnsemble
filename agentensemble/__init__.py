@@ -4,7 +4,7 @@ AgentEnsemble - Orchestrate AI agents in perfect harmony
 A comprehensive framework for building, testing, and orchestrating multi-agent AI systems.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Irfan Ali"
 
 # Core imports
