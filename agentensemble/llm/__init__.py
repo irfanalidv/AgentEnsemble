@@ -23,7 +23,7 @@ try:
     MISTRAL_AVAILABLE = True
 except ImportError:
     MISTRAL_AVAILABLE = False
-    MistralLLMProvider = None
+    MistralLLMProvider = None  # type: ignore[assignment,misc]
 
 try:
     from agentensemble.llm.openai_provider import OpenAILLMProvider
@@ -31,7 +31,7 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    OpenAILLMProvider = None
+    OpenAILLMProvider = None  # type: ignore[assignment,misc]
 
 __all__ = [
     "LLMProvider",

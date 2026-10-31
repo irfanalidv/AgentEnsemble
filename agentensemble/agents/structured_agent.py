@@ -25,9 +25,9 @@ try:
     STRUCTURED_OUTPUT_AVAILABLE = True
 except ImportError:
     CREATE_AGENT_AVAILABLE = False
-    create_agent = None
-    ToolStrategy = None
-    ProviderStrategy = None
+    create_agent = None  # type: ignore[assignment]
+    ToolStrategy = None  # type: ignore[assignment,misc]
+    ProviderStrategy = None  # type: ignore[assignment,misc]
     STRUCTURED_OUTPUT_AVAILABLE = False
 
 # with_structured_output is available if model has the method
@@ -161,7 +161,7 @@ class StructuredAgent:
                 },
             }
 
-        elif self._method == "with_structured_output":
+        if self._method == "with_structured_output":
             # Use with_structured_output approach
             structured_response = self.structured_model.invoke(query)
 
@@ -175,8 +175,7 @@ class StructuredAgent:
                 },
             }
 
-        else:
-            raise ValueError(f"Unknown method: {self._method}")
+        raise ValueError(f"Unknown method: {self._method}")
 
     async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """
@@ -197,10 +196,9 @@ class StructuredAgent:
         """
         if self._method == "create_agent":
             return self.agent.invoke(input, **kwargs)
-        else:
-            query = (
-                input.get("messages", [{}])[-1].get("content", "")
-                if isinstance(input.get("messages"), list)
-                else str(input)
-            )
-            return self.run(query, **kwargs)
+        query = (
+            input.get("messages", [{}])[-1].get("content", "")
+            if isinstance(input.get("messages"), list)
+            else str(input)
+        )
+        return self.run(query, **kwargs)

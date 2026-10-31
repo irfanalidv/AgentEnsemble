@@ -64,12 +64,11 @@ class Ensemble:
         """
         if self.conductor == "supervisor":
             return await self._supervisor_coordinate_async(task, data, **kwargs)
-        elif self.conductor == "swarm":
+        if self.conductor == "swarm":
             return await self._swarm_coordinate_async(task, data, **kwargs)
-        elif self.conductor == "pipeline":
+        if self.conductor == "pipeline":
             return await self._pipeline_coordinate_async(task, data, **kwargs)
-        else:
-            raise ValueError(f"Unknown conductor mode: {self.conductor}")
+        raise ValueError(f"Unknown conductor mode: {self.conductor}")
 
     def _supervisor_coordinate(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Supervisor pattern: Central agent coordinates others (sync)."""

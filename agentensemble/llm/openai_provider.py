@@ -17,8 +17,8 @@ try:
     LANGCHAIN_OPENAI_AVAILABLE = True
 except ImportError:
     LANGCHAIN_OPENAI_AVAILABLE = False
-    ChatOpenAI = None
-    DefaultAsyncHttpxClient = None
+    ChatOpenAI = None  # type: ignore[assignment,misc]
+    DefaultAsyncHttpxClient = None  # type: ignore[assignment,misc]
 
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 
@@ -26,7 +26,7 @@ DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 def _supports_temperature(model: str) -> bool:
     """Reasoning models (o-series, gpt-5 family) only accept the default temperature."""
     name = model.lower()
-    return not (name.startswith(("o1", "o3", "o4")) or name.startswith("gpt-5"))
+    return not (name.startswith(("o1", "o3", "o4", "gpt-5")))
 
 
 class OpenAILLMProvider(LangChainChatProvider):

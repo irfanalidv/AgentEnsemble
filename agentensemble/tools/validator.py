@@ -77,18 +77,16 @@ class ValidationTool:
                 justifications.append(f"Length {length} exceeds maximum {self.max_length}")
 
             # Required pattern
-            if self.required_pattern and valid:
-                if not self.required_pattern.search(text):
-                    valid = False
-                    justifications.append(
-                        f"Required pattern '{self.required_pattern.pattern}' not found"
-                    )
+            if self.required_pattern and valid and not self.required_pattern.search(text):
+                valid = False
+                justifications.append(
+                    f"Required pattern '{self.required_pattern.pattern}' not found"
+                )
 
             # Reject pattern (e.g., error indicators)
-            if self.reject_pattern and valid:
-                if self.reject_pattern.search(text):
-                    valid = False
-                    justifications.append(f"Rejected pattern '{self.reject_pattern.pattern}' found")
+            if self.reject_pattern and valid and self.reject_pattern.search(text):
+                valid = False
+                justifications.append(f"Rejected pattern '{self.reject_pattern.pattern}' found")
 
             # Deep mode: additional quality checks
             if self.validation_mode == "deep" and valid:
@@ -105,7 +103,7 @@ class ValidationTool:
             "valid": valid,
             "confidence": round(confidence, 2),
             "justifications": justifications,
-            "value": value[:500] + "..." if len(str(value)) > 500 else value,
+            "value": str(value)[:500] + "..." if len(str(value)) > 500 else value,
         }
 
     def __call__(

@@ -46,7 +46,7 @@ class TestStateGraphAgent:
     def test_stategraph_simple_run(self, stategraph_agent):
         # Override route to go start -> end
         def route(state, current):
-            return "end" if current == "start" else "end"
+            return "end"
 
         stategraph_agent._route = route
         result = stategraph_agent.run("hello")

@@ -80,7 +80,6 @@ class Benchmark:
         """
         if name == "research_tasks":
             return cls.research_tasks()
-        elif name == "data_extraction_tasks":
+        if name == "data_extraction_tasks":
             return cls.data_extraction_tasks()
-        else:
-            raise ValueError(f"Unknown benchmark: {name}")
+        raise ValueError(f"Unknown benchmark: {name}")

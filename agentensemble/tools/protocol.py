@@ -79,9 +79,7 @@ def _infer_schema_from_func(
 
         # Infer type from annotation
         ann = param.annotation
-        if ann is inspect.Parameter.empty:
-            schema_type = "string"
-        elif ann is str:
+        if ann is inspect.Parameter.empty or ann is str:
             schema_type = "string"
         elif ann is int:
             schema_type = "integer"

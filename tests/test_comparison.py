@@ -11,7 +11,7 @@ class TestAgentComparison:
 
     def test_comparison_runs_all_agents(self, stategraph_agent):
         def route(state, current):
-            return "end" if current == "start" else "end"
+            return "end"
 
         stategraph_agent._route = route
         rag = RAGAgent(name="rag", tools=[])
@@ -29,7 +29,7 @@ class TestAgentComparison:
 
     def test_comparison_summary_has_metrics(self, stategraph_agent):
         def route(state, current):
-            return "end" if current == "start" else "end"
+            return "end"
 
         stategraph_agent._route = route
         benchmark = Benchmark([{"query": "test"}])
@@ -44,7 +44,7 @@ class TestAgentComparison:
 
     def test_comparison_tracks_execution_time(self, stategraph_agent):
         def route(state, current):
-            return "end" if current == "start" else "end"
+            return "end"
 
         stategraph_agent._route = route
         benchmark = Benchmark([{"query": "x"}])

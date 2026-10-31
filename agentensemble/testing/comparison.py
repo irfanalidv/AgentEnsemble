@@ -27,9 +27,7 @@ def _is_successful_result(result: dict[str, Any]) -> bool:
         "unable to generate answer",
     ):
         return False
-    if len(s) < 5:
-        return False
-    return True
+    return not len(s) < 5
 
 
 class AgentComparison:

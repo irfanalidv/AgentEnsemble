@@ -72,7 +72,9 @@ class DebateOrchestrator:
             }
             tasks = [
                 solver.arun(
-                    f"Problem: {problem}\n\nOther proposals:\n{feedback_context['other_proposals']}\n\nRefine your answer.",
+                    f"Problem: {problem}\n\n"
+                    f"Other proposals:\n{feedback_context['other_proposals']}\n\n"
+                    "Refine your answer.",
                     context=feedback_context,
                     **kwargs,
                 )

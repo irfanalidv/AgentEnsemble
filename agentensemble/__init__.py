@@ -27,7 +27,7 @@ try:
     STRUCTURED_AVAILABLE = True
 except ImportError:
     STRUCTURED_AVAILABLE = False
-    StructuredAgent = None
+    StructuredAgent = None  # type: ignore[assignment,misc]
 
 from agentensemble.core import AgentProtocol
 from agentensemble.graph import Edge, Node, WorkflowGraph

@@ -21,7 +21,7 @@ try:
     STRUCTURED_AVAILABLE = True
 except ImportError:
     STRUCTURED_AVAILABLE = False
-    StructuredAgent = None
+    StructuredAgent = None  # type: ignore[assignment,misc]
 
 __all__ = [
     "BaseAgent",

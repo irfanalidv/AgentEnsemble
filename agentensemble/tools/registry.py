@@ -26,7 +26,7 @@ class ToolRegistry:
             tool: Tool instance
             name: Optional name (uses tool.name if available)
         """
-        tool_name = name or getattr(tool, "name", f"tool_{len(self._tools)}")
+        tool_name = str(name or getattr(tool, "name", None) or f"tool_{len(self._tools)}")
         self._tools[tool_name] = tool
 
     def register_many(self, tools: list[Any]) -> None:

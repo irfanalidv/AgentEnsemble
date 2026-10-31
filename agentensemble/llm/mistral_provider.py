@@ -22,7 +22,7 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    ChatMistralAI = None
+    ChatMistralAI = None  # type: ignore[assignment,misc]
 
 
 class MistralLLMProvider(LangChainChatProvider):

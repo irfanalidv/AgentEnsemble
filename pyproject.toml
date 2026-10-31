@@ -59,6 +59,7 @@ dependencies = [
     "langchain-community>=0.3.0",
     "langchain-mistralai>=0.2.0",
     "langchain-openai>=1.0.0",
+    "httpx>=0.25.0",
     "pydantic>=2.0.0",
     "typing-extensions>=4.5.0",
     "python-dotenv>=1.0.0",
@@ -111,17 +112,22 @@ target-version = "py310"
 extend-exclude = ["docs"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "UP", "B"]
-ignore = ["E501", "B008"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PTH", "RET", "PIE"]
+ignore = [
+    "RUF022",  # __all__ lists are grouped by category on purpose, not sorted alphabetically
+]
 
 [tool.ruff.lint.per-file-ignores]
-"examples/*" = ["E402"]
+"examples/*" = ["E402"]  # examples load .env / tweak sys.path before importing the package
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = true
+ignore_missing_imports = true
+warn_unused_ignores = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -129,4 +135,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # langchain-community announces its sunset on import; not actionable for our tests.
+    "ignore:`langchain-community` is being sunset:DeprecationWarning",
+]
 

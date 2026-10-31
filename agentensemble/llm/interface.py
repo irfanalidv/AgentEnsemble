@@ -89,7 +89,7 @@ class LLMProvider(ABC):
         Args:
             messages: Conversation history
             tools: Available tools (schema format)
-            tool_choice: "auto" | "required" | "none" | {"type": "function", "function": {"name": "..."}}
+            tool_choice: "auto" | "required" | "none", or a provider-specific tool name
             **kwargs: Provider-specific options (temperature, max_tokens, etc.)
 
         Returns:

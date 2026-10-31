@@ -49,7 +49,8 @@ def example_structured_output_pydantic():
     agent = StructuredAgent(
         name="contact_extractor",
         tools=[SearchTool()] if STRUCTURED_AVAILABLE else [],
-        response_format=ContactInfo,  # Uses available method (create_agent or with_structured_output)
+        # Uses whichever method is available (create_agent or with_structured_output)
+        response_format=ContactInfo,
     )
 
     # Extract structured data
@@ -136,7 +137,10 @@ def example_structured_output_with_search():
         name="researcher",
         tools=[SearchTool()],
         response_format=ResearchSummary,
-        system_prompt="You are a research assistant. Use search tools to find information and provide structured summaries.",
+        system_prompt=(
+            "You are a research assistant. Use search tools to find information "
+            "and provide structured summaries."
+        ),
     )
 
     # Research topic

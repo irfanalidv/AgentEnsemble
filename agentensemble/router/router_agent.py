@@ -104,7 +104,7 @@ class RouterAgent(BaseAgent):
                 return await agent.arun(query, **kwargs)
             return {"result": "No agents available", "metadata": {"routed_to": None}}
 
-        agent_descriptions = "\n".join(f"- {name}: available" for name in self.agents.keys())
+        agent_descriptions = "\n".join(f"- {name}: available" for name in self.agents)
         prompt = f"""Query: {query}
 
 Available agents:
@@ -115,17 +115,19 @@ Select the best agent for this task. Reply with the agent name only if unsure.""
         messages = [
             LLMMessage(
                 role="system",
-                content="You are a routing agent. Select the single best agent for each query. Reply with the agent name from the list.",
+                content=(
+                    "You are a routing agent. Select the single best agent for each query. "
+                    "Reply with the agent name from the list."
+                ),
             ),
             LLMMessage(role="user", content=prompt),
         ]
 
         agent_names = list(self.agents.keys())
         if len(agent_names) == 1:
-            agent_name = agent_names[0]
-            agent = self.agents[agent_name]
-            result = await agent.arun(query, **kwargs)
-            result.setdefault("metadata", {})["routed_to"] = agent_name
+            only = agent_names[0]
+            result = await self.agents[only].arun(query, **kwargs)
+            result.setdefault("metadata", {})["routed_to"] = only
             return result
 
         schema = ToolSchema(
@@ -150,7 +152,7 @@ Select the best agent for this task. Reply with the agent name only if unsure.""
             tool_choice="auto",
         )
 
-        agent_name = None
+        agent_name: str | None = None
         if response.tool_calls:
             agent_name = (response.tool_calls[0].arguments.get("agent_name") or "").strip()
         if not agent_name or agent_name not in self.agents:

@@ -70,7 +70,7 @@ class TestRunner:
 
     def test_run_with_real_agent(self, stategraph_agent):
         def route(state, current):
-            return "end" if current == "start" else "end"
+            return "end"
 
         stategraph_agent._route = route
         result = Runner.run(stategraph_agent, "hello")
