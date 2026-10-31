@@ -50,4 +50,3 @@ ruff check .
 - Bug fixes
 
 Thank you for contributing! 🚀
-

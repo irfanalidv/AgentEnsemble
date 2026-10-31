@@ -508,7 +508,7 @@ print(result["result"][:200], "...")
 
 **Output:**
 ```
-Task decomposition is the process of breaking complex tasks into smaller, 
+Task decomposition is the process of breaking complex tasks into smaller,
 manageable subtasks that can be executed by specialized agents...
 ```
 

@@ -40,7 +40,7 @@ from typing import Protocol, runtime_checkable
 @runtime_checkable
 class AgentProtocol(Protocol):
     name: str
-    
+
     def run(self, query: str, **kwargs) -> dict: ...
     async def arun(self, query: str, **kwargs) -> dict: ...
 ```
@@ -82,10 +82,10 @@ class AgentState(BaseModel):
 class Runner:
     @staticmethod
     def run(agent: AgentProtocol, input: str | RunState, config: RunConfig | None = None) -> RunResult: ...
-    
+
     @staticmethod
     async def arun(...) -> RunResult: ...
-    
+
     @staticmethod
     def stream(...) -> RunResultStreaming: ...
 
@@ -112,7 +112,7 @@ class RunConfig:
 # agentensemble/memory/session.py
 class Session(Protocol):
     session_id: str
-    
+
     async def get_messages(self, limit: int | None = None) -> list[dict]: ...
     async def add_messages(self, messages: list[dict]) -> None: ...
     async def clear(self) -> None: ...
@@ -178,9 +178,9 @@ result = runner.run(agent, input, config=RunConfig(
 # agentensemble/orchestration/debate.py
 class DebateOrchestrator:
     """Solver agents propose → exchange feedback → aggregator votes."""
-    
+
     def __init__(self, solvers: list[BaseAgent], aggregator: BaseAgent, rounds: int = 3): ...
-    
+
     async def debate(self, problem: str) -> dict: ...
 ```
 
@@ -214,7 +214,7 @@ agent = ReActAgent(handoffs=[Handoff(billing_agent, "Billing question"), ...])
 # agentensemble/tools/mcp.py
 class MCPToolAdapter:
     """Connect to MCP server for dynamic tool discovery."""
-    
+
     async def connect(self, server_url: str) -> list[ToolSchema]: ...
     async def call(self, tool_name: str, arguments: dict) -> Any: ...
 ```
