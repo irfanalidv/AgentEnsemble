@@ -18,7 +18,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 try:
-    from langchain_community.document_loaders import WebBaseLoader
     from langchain_community.vectorstores import Chroma
     from langchain_core.documents import Document
     from langchain_core.tools import tool
@@ -29,7 +28,6 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    WebBaseLoader = None  # type: ignore[assignment,misc]
     Chroma = None  # type: ignore[assignment,misc]
     InMemoryVectorStore = None  # type: ignore[assignment,misc]
     MistralAIEmbeddings = None  # type: ignore[assignment,misc]
@@ -37,7 +35,21 @@ except ImportError:
     RecursiveCharacterTextSplitter = None  # type: ignore[assignment,misc]
     tool = None  # type: ignore[assignment]
 
+#: Web page loader class, imported on first use. Importing ``WebBaseLoader`` makes
+#: langchain-community log a USER_AGENT warning, which ``import agentensemble`` should not do.
+WebBaseLoader: Any = None
+
 logger = logging.getLogger(__name__)
+
+
+def _web_loader_class() -> Any:
+    global WebBaseLoader
+    if WebBaseLoader is None:
+        from langchain_community.document_loaders import WebBaseLoader as loader_cls
+
+        WebBaseLoader = loader_cls
+    return WebBaseLoader
+
 
 #: Default per-request timeout (seconds) for fetching URLs in ``index_documents``.
 DEFAULT_FETCH_TIMEOUT = 30.0
@@ -123,8 +135,9 @@ class RAGTool:
         Args:
             urls: List of URLs to load and index
         """
-        if not LANGCHAIN_AVAILABLE or WebBaseLoader is None:
+        if not LANGCHAIN_AVAILABLE:
             raise ImportError("langchain-community required for indexing")
+        loader_cls = _web_loader_class()
 
         self._initialize_components()
 
@@ -132,7 +145,7 @@ class RAGTool:
         documents = []
         for url in urls:
             try:
-                loader = WebBaseLoader(
+                loader = loader_cls(
                     web_paths=(url,),
                     requests_kwargs={"timeout": self.fetch_timeout},
                     raise_for_status=True,
