@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-31
+
+### Added
+- **OpenAI support.** New `OpenAILLMProvider` (LangChain `ChatOpenAI`, native tool calling).
+  Default model `gpt-4.1-mini`, configurable via `OPENAI_MODEL`; `OPENAI_BASE_URL` for
+  OpenAI-compatible endpoints. Temperature is omitted for reasoning models (o-series, gpt-5).
+- `get_default_provider()` / `resolve_provider_name()`: agents now pick OpenAI when
+  `OPENAI_API_KEY` is set, otherwise Mistral; `AGENTENSEMBLE_LLM_PROVIDER` forces one.
+- `agentensemble.utils.get_chat_model()` and `get_openai_model()`; `StructuredAgent` uses the
+  same OpenAI-or-Mistral selection.
+- `langchain-openai` is now a core dependency.
+
+### Fixed
+- Calling a sync agent API twice (e.g. `agent.run()` then `agent.run()`, or `run()` followed by
+  `asyncio.run(agent.arun())`) failed with `RuntimeError: Event loop is closed`. Each sync call
+  uses `asyncio.run()`, and the LLM's async HTTP client stayed bound to the first, closed loop.
+  Providers now rebuild their chat model when used on a new event loop, and each OpenAI model
+  gets its own async HTTP client instead of the process-wide cached one.
+
+### Changed
+- Shared LangChain conversion logic moved to `agentensemble.llm.langchain_base`
+  (`LangChainChatProvider`); `MistralLLMProvider` keeps its public API.
+
 ## [0.4.0] - 2026-10-31
 
 ### Fixed

@@ -28,13 +28,7 @@ except ImportError:
     TraceEvent = None
     estimate_cost = None
 
-try:
-    from agentensemble.llm.mistral_provider import MistralLLMProvider
-
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    MistralLLMProvider = None
+from agentensemble.llm.factory import get_default_provider
 
 
 class ReActAgent(BaseAgent):
@@ -61,16 +55,16 @@ class ReActAgent(BaseAgent):
             name: Agent name
             tools: Available tools (SearchTool, RAGTool, FunctionTool, etc.)
             max_iterations: Maximum reasoning/acting cycles
-            llm: LLM provider (default: MistralLLMProvider if available)
+            llm: LLM provider (default: OpenAI or Mistral, picked from the environment)
             session: Optional Session for multi-turn conversation history
             **kwargs: Additional configuration
         """
         super().__init__(name, tools, max_iterations, **kwargs)
         self.llm = llm
         self.session = session
-        if self.llm is None and LLM_AVAILABLE and MistralLLMProvider:
+        if self.llm is None:
             try:
-                self.llm = MistralLLMProvider(temperature=0.2)
+                self.llm = get_default_provider(temperature=0.2)
             except (ValueError, ImportError):
                 # No API key yet: the agent can still be constructed and inspected;
                 # run()/stream() raise a clear RuntimeError until an LLM is available.
@@ -117,7 +111,7 @@ class ReActAgent(BaseAgent):
         """Stream events during ReAct loop."""
         if self.llm is None:
             raise RuntimeError(
-                "LLM required for ReActAgent. Install langchain-mistralai and set MISTRAL_API_KEY."
+                "LLM required for ReActAgent. Set OPENAI_API_KEY or MISTRAL_API_KEY, or pass llm=."
             )
 
         state = AgentState(query=query, context=kwargs.get("context", {}))
@@ -277,7 +271,7 @@ class ReActAgent(BaseAgent):
         """Async ReAct loop: Reason -> Act -> Observe until final answer."""
         if self.llm is None:
             raise RuntimeError(
-                "LLM required for ReActAgent. Install langchain-mistralai and set MISTRAL_API_KEY, "
+                "LLM required for ReActAgent. Set OPENAI_API_KEY or MISTRAL_API_KEY, or pass llm=, "
                 "or pass llm=YourLLMProvider()."
             )
 

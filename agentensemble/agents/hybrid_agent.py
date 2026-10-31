@@ -9,16 +9,8 @@ import asyncio
 from typing import Any
 
 from agentensemble.agents.base import AgentState, BaseAgent
+from agentensemble.llm.factory import get_default_provider
 from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolSchema
-
-try:
-    from agentensemble.llm.mistral_provider import MistralLLMProvider
-
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    MistralLLMProvider = None
-
 
 # Routing tool: LLM chooses next action via function calling
 ROUTE_ACTION_SCHEMA = ToolSchema(
@@ -66,16 +58,16 @@ class HybridAgent(BaseAgent):
             tools: Available tools (search, rag, validator)
             max_iterations: Maximum iterations
             early_stopping: Enable early stopping when answer found
-            llm: LLM provider for routing (default: MistralLLMProvider if available).
+            llm: LLM provider for routing (default: OpenAI or Mistral, picked from the environment).
                  If None, uses fixed pipeline: SEARCH -> RAG -> VALIDATE -> ANSWER
             **kwargs: Additional configuration
         """
         super().__init__(name, tools, max_iterations, **kwargs)
         self.early_stopping = early_stopping
         self.llm = llm
-        if self.llm is None and LLM_AVAILABLE and MistralLLMProvider:
+        if self.llm is None:
             try:
-                self.llm = MistralLLMProvider(temperature=0.2)
+                self.llm = get_default_provider(temperature=0.2)
             except (ValueError, ImportError):
                 self.llm = None  # Fall back to fixed pipeline if no API key
 

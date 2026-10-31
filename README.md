@@ -62,15 +62,29 @@ print(graph.run("What is multi-agent AI?")["result"])
 # Summary for: What is multi-agent AI?
 ```
 
-LLM-powered agents (`ReActAgent`, `HybridAgent`, `RouterAgent`, `StructuredAgent`) use Mistral by
-default. Set `MISTRAL_API_KEY`, or pass any `LLMProvider` implementation via `llm=...`.
+LLM-powered agents (`ReActAgent`, `HybridAgent`, `RouterAgent`, `StructuredAgent`) work with
+**OpenAI** or **Mistral**. The provider is picked from your environment: OpenAI if
+`OPENAI_API_KEY` is set, otherwise Mistral if `MISTRAL_API_KEY` is set. You can also pass any
+`LLMProvider` explicitly via `llm=...`:
+
+```python
+from agentensemble import ReActAgent
+from agentensemble.llm import OpenAILLMProvider, MistralLLMProvider
+
+agent = ReActAgent(tools=[...], llm=OpenAILLMProvider(model="gpt-4.1-mini"))
+agent = ReActAgent(tools=[...], llm=MistralLLMProvider(model="mistral-small-latest"))
+```
 
 ## Configuration
 
 | Variable | Purpose |
 | --- | --- |
-| `MISTRAL_API_KEY` | Required for the default Mistral LLM provider (ReAct, Hybrid, Router, Structured agents). |
+| `OPENAI_API_KEY` | Enables the OpenAI provider (preferred when set). |
+| `OPENAI_MODEL` | Optional default model for `OpenAILLMProvider` (default: `gpt-4.1-mini`). Reasoning models such as `gpt-5-mini` work too; temperature is left at the API default for them. |
+| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint (Azure OpenAI proxy, vLLM, LM Studio, ...). |
+| `MISTRAL_API_KEY` | Enables the Mistral provider (used when no OpenAI key is set). |
 | `MISTRAL_MODEL` | Optional default model for `MistralLLMProvider` (default: `mistral-large-latest`). Use e.g. `mistral-small-latest` if your plan doesn't include the large model. |
+| `AGENTENSEMBLE_LLM_PROVIDER` | Optional. Force `openai` or `mistral` when both keys are set. |
 | `SERPER_API_KEY` | Optional. When set, `SearchTool()` uses Serper; otherwise it falls back to DuckDuckGo (needs the `search` extra). |
 
 Copy `.env.example` to `.env` and fill in your keys (`KEY=value`, no spaces around `=`); the
@@ -85,7 +99,7 @@ Without an API key, LLM agents can still be constructed (and inspected or regist
 
 - **Modular** — Agents, tools, orchestration, and memory are decoupled
 - **Async-first** — `run()` and `arun()` on all agents; parallel execution via `asyncio.gather`
-- **Provider-agnostic** — LLM interface supports Mistral (OpenAI/Anthropic-ready)
+- **Provider-agnostic** — one LLM interface, OpenAI and Mistral built in
 - **Production patterns** — Runner, retries, hooks, tracing, session memory
 
 ---
@@ -137,7 +151,7 @@ Without an API key, LLM agents can still be constructed (and inspected or regist
 
 ```bash
 pip install "agentensemble[search]"
-export MISTRAL_API_KEY=...
+export OPENAI_API_KEY=...      # or: export MISTRAL_API_KEY=...
 ```
 
 ```python
@@ -154,7 +168,7 @@ print(result["result"])
 
 ## Examples — Code + Output
 
-Each example is runnable. Requires `MISTRAL_API_KEY` (and the `search` extra for `SearchTool`; `SERPER_API_KEY` is optional). Outputs below are from the author's runs; LLM answers will vary.
+Each example is runnable. Requires `OPENAI_API_KEY` or `MISTRAL_API_KEY` (and the `search` extra for `SearchTool`; `SERPER_API_KEY` is optional). Outputs below are from the author's runs; LLM answers will vary.
 
 ---
 
@@ -638,7 +652,7 @@ Runs all demos with real API calls.
 agentensemble/
 ├── agents/         # ReAct, StateGraph, RAG, Hybrid, Structured
 ├── core/           # AgentProtocol, RunnableProtocol
-├── llm/            # LLMProvider, MistralLLMProvider
+├── llm/            # LLMProvider, OpenAILLMProvider, MistralLLMProvider, get_default_provider
 ├── memory/         # Session, InMemorySession, SQLiteSession
 ├── orchestration/  # Ensemble, Supervisor, Swarm, Pipeline, Debate
 ├── tools/          # Tool protocol, @function_tool, built-ins
@@ -656,7 +670,7 @@ agentensemble/
 
 | Feature            | AgentEnsemble             | LangGraph    | CrewAI | AutoGen |
 | ------------------ | ------------------------- | ------------ | ------ | ------- |
-| Multi-provider LLM | Mistral (extensible)      | Any          | Any    | Any     |
+| Multi-provider LLM | OpenAI, Mistral (extensible) | Any          | Any    | Any     |
 | Async API          | `arun()` everywhere       | Yes          | Yes    | Yes     |
 | Router agents      | RouterAgent               | Manual       | Yes    | Manual  |
 | Planner pattern    | PlannerAgent              | Manual       | Yes    | Manual  |

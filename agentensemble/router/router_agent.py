@@ -8,16 +8,8 @@ from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 from agentensemble.core.protocol import AgentProtocol
+from agentensemble.llm.factory import get_default_provider
 from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolSchema
-
-try:
-    from agentensemble.llm.mistral_provider import MistralLLMProvider
-
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    MistralLLMProvider = None
-
 
 ROUTE_AGENT_SCHEMA = ToolSchema(
     name="route_to_agent",
@@ -56,9 +48,9 @@ class RouterAgent(BaseAgent):
         super().__init__(name, tools=[], max_iterations=1, **kwargs)
         self.agents = agents or {}
         self.llm = llm
-        if self.llm is None and LLM_AVAILABLE and MistralLLMProvider:
+        if self.llm is None:
             try:
-                self.llm = MistralLLMProvider(temperature=0.1)
+                self.llm = get_default_provider(temperature=0.1)
             except (ValueError, ImportError):
                 self.llm = None
 

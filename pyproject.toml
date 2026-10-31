@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentensemble"
-version = "0.4.0"
+version = "0.5.0"
 description = "Build, orchestrate, trace, and test multi-agent LLM systems in Python: ReAct, RAG, router, planner, workflow graphs, swarms, debates, and pipelines."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,7 @@ keywords = [
     "langchain",
     "langgraph",
     "mistral",
+    "openai",
     "rag",
     "react-agent",
     "tool-calling",
@@ -57,6 +58,7 @@ dependencies = [
     "langchain-core>=1.0.0",
     "langchain-community>=0.3.0",
     "langchain-mistralai>=0.2.0",
+    "langchain-openai>=1.0.0",
     "pydantic>=2.0.0",
     "typing-extensions>=4.5.0",
     "python-dotenv>=1.0.0",

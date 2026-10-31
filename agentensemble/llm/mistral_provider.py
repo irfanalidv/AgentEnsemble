@@ -5,151 +5,36 @@ Implements LLMProvider using Mistral AI via LangChain.
 Uses bind_tools for native function calling (preferred over text parsing).
 """
 
-import json
+import os
 from typing import Any
 
-from agentensemble.llm.interface import (
-    LLMMessage,
-    LLMProvider,
-    LLMResponse,
-    ToolCall,
-    ToolSchema,
+from agentensemble.llm.langchain_base import (  # noqa: F401  (re-exported for compatibility)
+    LangChainChatProvider,
+    _extract_usage,
+    _messages_to_langchain,
+    _parse_ai_message,
+    _tool_schema_to_langchain,
 )
 
 try:
-    from langchain_core.messages import (
-        AIMessage,
-        BaseMessage,
-        HumanMessage,
-        SystemMessage,
-        ToolMessage,
-    )
-    from langchain_core.messages import (
-        ToolCall as LCToolCall,
-    )
-    from langchain_core.runnables import Runnable
     from langchain_mistralai import ChatMistralAI
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
     ChatMistralAI = None
-    LCToolCall = None
-    Runnable = None
 
 
-def _tool_schema_to_langchain(schema: ToolSchema) -> dict[str, Any]:
-    """Convert ToolSchema to OpenAI-style format for Mistral."""
-    return {
-        "type": "function",
-        "function": {
-            "name": schema.name,
-            "description": schema.description,
-            "parameters": schema.parameters
-            if schema.parameters
-            else {"type": "object", "properties": {}},
-        },
-    }
-
-
-def _messages_to_langchain(messages: list[LLMMessage]) -> list["BaseMessage"]:
-    """Convert LLMMessage list to LangChain format."""
-    result: list[BaseMessage] = []
-    for msg in messages:
-        content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
-        if msg.role == "system":
-            result.append(SystemMessage(content=content_str))
-        elif msg.role == "user":
-            result.append(HumanMessage(content=content_str))
-        elif msg.role == "assistant":
-            lc_tool_calls = []
-            if msg.tool_calls:
-                for tc in msg.tool_calls:
-                    lc_tool_calls.append(
-                        LCToolCall(
-                            id=tc.id or f"call_{tc.name}",
-                            type="function",
-                            name=tc.name,
-                            args=tc.arguments,
-                        )
-                    )
-            result.append(
-                AIMessage(content=content_str, tool_calls=lc_tool_calls if lc_tool_calls else [])
-            )
-        elif msg.role == "tool":
-            result.append(
-                ToolMessage(
-                    content=content_str,
-                    tool_call_id=msg.tool_call_id or "",
-                )
-            )
-    return result
-
-
-def _extract_usage(msg: "AIMessage") -> dict[str, int] | None:
-    """Extract token usage from LangChain AIMessage (usage_metadata or response_metadata)."""
-    um = getattr(msg, "usage_metadata", None)
-    if um and isinstance(um, dict):
-        return {
-            "input_tokens": um.get("input_tokens", 0),
-            "output_tokens": um.get("output_tokens", 0),
-            "total_tokens": um.get("total_tokens", 0),
-        }
-    rm = getattr(msg, "response_metadata", None) or {}
-    usage = rm.get("usage") or rm.get("usage_metadata") or {}
-    if usage:
-        return {
-            "input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
-            "output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
-            "total_tokens": usage.get("total_tokens", 0),
-        }
-    return None
-
-
-def _parse_ai_message(msg: AIMessage) -> LLMResponse:
-    """Extract LLMResponse from LangChain AIMessage."""
-    content = msg.content if isinstance(msg.content, str) else ""
-    tool_calls: list[ToolCall] = []
-    usage = _extract_usage(msg)
-
-    if hasattr(msg, "tool_calls") and msg.tool_calls:
-        for tc in msg.tool_calls:
-            if isinstance(tc, dict):
-                args = tc.get("args", tc.get("arguments", {}))
-                tc_id = tc.get("id", "")
-                tc_name = tc.get("name", "")
-            else:
-                args = getattr(tc, "args", getattr(tc, "arguments", {}))
-                tc_id = getattr(tc, "id", "") or ""
-                tc_name = getattr(tc, "name", "") or ""
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    args = {}
-            tool_calls.append(
-                ToolCall(
-                    id=tc_id,
-                    name=tc_name,
-                    arguments=args if isinstance(args, dict) else {},
-                )
-            )
-
-    return LLMResponse(
-        content=content or None,
-        tool_calls=tool_calls,
-        finish_reason="tool_calls" if tool_calls else "stop",
-        usage=usage,
-    )
-
-
-class MistralLLMProvider(LLMProvider):
+class MistralLLMProvider(LangChainChatProvider):
     """
     Mistral AI provider using LangChain's ChatMistralAI.
 
     Uses bind_tools for native function calling—cleaner than
     THOUGHT/ACTION/PAUSE text parsing (LangChain 2024 best practice).
     """
+
+    # Mistral spells "must call a tool" as "any".
+    REQUIRED_TOOL_CHOICE = "any"
 
     def __init__(
         self,
@@ -174,63 +59,19 @@ class MistralLLMProvider(LLMProvider):
                 "Install: pip install langchain-mistralai langchain-core"
             )
 
-        import os
-
         model = model or os.getenv("MISTRAL_MODEL") or "mistral-large-latest"
         key = api_key or os.getenv("MISTRAL_API_KEY")
         if not key:
             raise ValueError("MISTRAL_API_KEY required. Set in .env or pass api_key.")
 
-        self._model = ChatMistralAI(
-            model=model,
-            temperature=temperature,
-            mistral_api_key=key,
+        self._options: dict[str, Any] = {
+            "model": model,
+            "temperature": temperature,
+            "mistral_api_key": key,
             **kwargs,
-        )
+        }
         self.model_name = model
+        self._init_model()
 
-    def _bind_tools(
-        self,
-        tools: list[ToolSchema] | None = None,
-        tool_choice: str | None = None,
-    ) -> "Runnable":
-        """Bind tools to model for function calling."""
-        if not tools:
-            return self._model
-
-        tool_defs = [_tool_schema_to_langchain(t) for t in tools]
-        bound = self._model.bind_tools(tool_defs)
-
-        if tool_choice == "required" and tools:
-            # Mistral: use "any" to force tool use (required -> any per Mistral API)
-            bound = bound.bind(tool_choice="any")
-        elif tool_choice and tool_choice != "auto":
-            bound = bound.bind(tool_choice=tool_choice)
-
-        return bound
-
-    def generate(
-        self,
-        messages: list[LLMMessage],
-        tools: list[ToolSchema] | None = None,
-        tool_choice: str | None = None,
-        **kwargs: Any,
-    ) -> LLMResponse:
-        """Synchronous generation with optional tool calling."""
-        lc_messages = _messages_to_langchain(messages)
-        bound = self._bind_tools(tools, tool_choice)
-        response = bound.invoke(lc_messages, **kwargs)
-        return _parse_ai_message(response)
-
-    async def agenerate(
-        self,
-        messages: list[LLMMessage],
-        tools: list[ToolSchema] | None = None,
-        tool_choice: str | None = None,
-        **kwargs: Any,
-    ) -> LLMResponse:
-        """Async generation with optional tool calling."""
-        lc_messages = _messages_to_langchain(messages)
-        bound = self._bind_tools(tools, tool_choice)
-        response = await bound.ainvoke(lc_messages, **kwargs)
-        return _parse_ai_message(response)
+    def _build_model(self) -> Any:
+        return ChatMistralAI(**self._options)

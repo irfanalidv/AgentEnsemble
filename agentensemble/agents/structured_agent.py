@@ -14,13 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-try:
-    from agentensemble.utils.llm import get_mistral_model
-
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    get_mistral_model = None
+from agentensemble.utils.llm import get_chat_model
 
 # Try langchain>=1.1 approach (create_agent with response_format)
 try:
@@ -72,15 +66,9 @@ class StructuredAgent:
             system_prompt: System prompt for the agent
             **kwargs: Additional configuration
         """
-        if not LLM_AVAILABLE:
-            raise ImportError(
-                "langchain-mistralai is required for StructuredAgent. "
-                "Install with: pip install langchain-mistralai"
-            )
-
         self.name = name
         self.tools = tools or []
-        self.model = model or get_mistral_model()
+        self.model = model or get_chat_model(temperature=0.2)
         self.response_format = response_format
         self.system_prompt = system_prompt
         self.config = kwargs
