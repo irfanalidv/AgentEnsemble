@@ -420,3 +420,13 @@ def test_estimate_cost_prefix_match_and_fallback():
     assert estimate_cost(usage, model="gpt-4.1") == pytest.approx(10.0)
     assert estimate_cost(usage, model="unknown-model") == pytest.approx(8.0)  # mistral-large
     assert estimate_cost(usage, model="m", pricing={"m": (1.0, 1.0)}) == pytest.approx(2.0)
+
+
+def test_builtin_tools_describe_themselves_to_the_llm():
+    schemas = {s.name: s for s in get_tool_schemas([RAGTool(description="Company FAQ")])}
+    assert schemas["rag"].description == "Company FAQ"
+    assert "knowledge base" in RAGTool().description
+    from agentensemble import SearchTool
+
+    (search_schema,) = get_tool_schemas([SearchTool(provider="duckduckgo")])
+    assert search_schema.description.startswith("Search the web")

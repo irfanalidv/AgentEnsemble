@@ -74,6 +74,7 @@ class RAGTool:
         chunk_overlap: int = 200,
         fallback_strategies: int = 3,
         fetch_timeout: float = DEFAULT_FETCH_TIMEOUT,
+        description: str | None = None,
         **kwargs: Any,
     ):
         """
@@ -81,14 +82,20 @@ class RAGTool:
 
         Args:
             vector_store: Pre-initialized vector store (or None to create one)
-            embeddings: Pre-initialized embeddings model (or None to use Mistral)
+            embeddings: Embeddings model (default: OpenAI or Mistral, picked from the environment)
             chunk_size: Size of text chunks for splitting
             chunk_overlap: Overlap between chunks
             fallback_strategies: Number of fallback query variations
             fetch_timeout: Per-request timeout in seconds when loading URLs
+            description: Tool description shown to the LLM (describe your corpus here)
             **kwargs: Additional configuration
         """
         self.name = "rag"
+        #: Shown to the LLM in the tool schema; override to describe your corpus.
+        self.description = description or (
+            "Search the indexed knowledge base and return the most relevant passages. "
+            "Use it for any question the documents may answer."
+        )
         self.vector_store = vector_store
         self.embeddings = embeddings
         self.chunk_size = chunk_size

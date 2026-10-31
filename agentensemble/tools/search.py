@@ -72,6 +72,8 @@ class SearchTool:
             **kwargs: Additional configuration
         """
         self.name = "search"
+        #: Shown to the LLM in the tool schema.
+        self.description = "Search the web for current information and return result snippets."
 
         # Auto-detect provider if not specified
         if provider is None:
