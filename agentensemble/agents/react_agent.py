@@ -5,8 +5,9 @@ LLM-powered reasoning + acting pattern with native tool calling.
 Uses function calling (not text parsing) per 2024 best practices.
 
 Research basis:
-- ReAct: Synergizing Reasoning and Acting (Yao et al., 2022)
-- Native tool/function calling preferred over THOUGHT/ACTION parsing (LangChain 2024)
+- ReAct: Synergizing Reasoning and Acting in Language Models (Yao et al., ICLR 2023)
+- The reason/act/observe loop is driven by native tool/function calling instead of parsing
+  THOUGHT/ACTION text.
 """
 
 import asyncio
@@ -24,9 +25,9 @@ try:
     TRACING_AVAILABLE = True
 except ImportError:
     TRACING_AVAILABLE = False
-    TraceEventType = None
-    TraceEvent = None
-    estimate_cost = None
+    TraceEventType = None  # type: ignore[assignment,misc]
+    TraceEvent = None  # type: ignore[assignment,misc]
+    estimate_cost = None  # type: ignore[assignment]
 
 from agentensemble.llm.factory import get_default_provider
 
@@ -184,52 +185,31 @@ class ReActAgent(BaseAgent):
             },
         }
 
-    def _session_to_messages(self, limit: int = 20) -> list[LLMMessage]:
-        """Load session history and convert to LLMMessage list."""
-        if not self.session:
+    def _session_to_messages(self, limit: int = 20, session: Any | None = None) -> list[LLMMessage]:
+        """Load the latest ``limit`` session messages as LLMMessages.
+
+        The window is trimmed to start at a ``user`` message: cutting the history in the middle
+        of a tool exchange would leave ``tool`` messages without the assistant message that
+        requested them, which chat APIs reject.
+        """
+        session = session if session is not None else self.session
+        if not session:
             return []
-        raw = self.session.get_messages(limit=limit)
-        out: list[LLMMessage] = []
-        for m in raw:
-            tc = None
-            if m.get("tool_calls"):
-                tc = [
-                    ToolCall(
-                        id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {})
-                    )
-                    for x in m["tool_calls"]
-                ]
-            out.append(
-                LLMMessage(
-                    role=m["role"],
-                    content=m.get("content", ""),
-                    tool_call_id=m.get("tool_call_id"),
-                    tool_calls=tc,
-                )
-            )
-        return out
+        raw = list(session.get_messages(limit=limit))
+        while raw and raw[0].get("role") != "user":
+            raw.pop(0)
+        return self._dicts_to_messages(raw)
 
-    def _messages_to_session(self, to_save: list[LLMMessage]) -> None:
+    def _messages_to_session(self, to_save: list[LLMMessage], session: Any | None = None) -> None:
         """Save messages to session."""
-        if not self.session:
+        session = session if session is not None else self.session
+        if not session:
             return
-        raw = []
-        for m in to_save:
-            d: dict[str, Any] = {
-                "role": m.role,
-                "content": m.content if isinstance(m.content, str) else "",
-            }
-            if m.tool_call_id:
-                d["tool_call_id"] = m.tool_call_id
-            if m.tool_calls:
-                d["tool_calls"] = [
-                    {"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls
-                ]
-            raw.append(d)
-        self.session.add_messages(raw)
+        session.add_messages(self._messages_to_dicts(to_save))
 
-    def _messages_to_dicts(self, msgs: list[LLMMessage]) -> list[dict[str, Any]]:
-        """Serialize messages for run_state (human-in-loop resume)."""
+    @staticmethod
+    def _messages_to_dicts(msgs: list[LLMMessage]) -> list[dict[str, Any]]:
+        """Serialize messages for sessions and run_state (human-in-loop resume)."""
         out = []
         for m in msgs:
             d: dict[str, Any] = {
@@ -245,8 +225,9 @@ class ReActAgent(BaseAgent):
             out.append(d)
         return out
 
-    def _dicts_to_messages(self, raw: list[dict[str, Any]]) -> list[LLMMessage]:
-        """Deserialize messages from run_state."""
+    @staticmethod
+    def _dicts_to_messages(raw: list[dict[str, Any]]) -> list[LLMMessage]:
+        """Deserialize messages from sessions and run_state."""
         out: list[LLMMessage] = []
         for m in raw:
             tc = None
@@ -275,6 +256,7 @@ class ReActAgent(BaseAgent):
                 "or pass llm=YourLLMProvider()."
             )
 
+        session = kwargs.get("session") or self.session
         run_config = kwargs.get("run_config")
         trace_hooks = getattr(run_config, "trace_hooks", None) if run_config else None
         interrupt_tools = getattr(run_config, "interrupt_before_tools", None) or []
@@ -295,7 +277,7 @@ class ReActAgent(BaseAgent):
             )
         else:
             state = AgentState(query=query, context=kwargs.get("context", {}))
-            history = self._session_to_messages()
+            history = self._session_to_messages(session=session)
             messages = [
                 LLMMessage(role="system", content=""),
                 *history,
@@ -309,7 +291,10 @@ class ReActAgent(BaseAgent):
 
         tool_schemas = get_tool_schemas(self.tools) if self.tools else []
         tool_map = {t.name: t for t in self.tools} if self.tools else {}
-        history_len = len(self._session_to_messages())
+        # Index of this turn's user message; earlier messages are session history.
+        turn_start = max(
+            (i for i, m in enumerate(messages) if m.role == "user"), default=len(messages)
+        )
         total_usage: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
         if trace_hooks and TRACING_AVAILABLE:
@@ -323,7 +308,8 @@ class ReActAgent(BaseAgent):
             if not self._validate_state(state):
                 break
 
-            has_tool_results = any(m.role == "tool" for m in messages)
+            # After this turn's first round of tool results, ask the model to answer.
+            has_tool_results = any(m.role == "tool" for m in messages[turn_start:])
             use_tools = tool_schemas and not has_tool_results
 
             llm_start = time.perf_counter()
@@ -345,8 +331,8 @@ class ReActAgent(BaseAgent):
                 llm_data: dict[str, Any] = {}
                 if response.usage:
                     llm_data["usage"] = response.usage
-                    if estimate_cost:
-                        model = getattr(self.llm, "model_name", "mistral-large-latest")
+                    if estimate_cost is not None:
+                        model = getattr(self.llm, "model_name", "")
                         llm_data["cost_usd"] = estimate_cost(response.usage, model=model)
                 trace_hooks.emit(
                     TraceEvent(
@@ -422,12 +408,15 @@ class ReActAgent(BaseAgent):
                     )
             else:
                 state.result = response.content or state.result
+                if response.content:
+                    messages.append(LLMMessage(role="assistant", content=response.content))
                 break
 
-        if self.session:
-            to_save = messages[history_len + 2 :]
+        if session:
+            # Persist this turn: the user query, tool exchanges, and the final answer.
+            to_save = messages[turn_start:]
             if to_save:
-                self._messages_to_session(to_save)
+                self._messages_to_session(to_save, session=session)
 
         metadata: dict[str, Any] = {
             "iterations": state.iteration_count,
@@ -436,8 +425,8 @@ class ReActAgent(BaseAgent):
         }
         if total_usage.get("total_tokens"):
             metadata["total_usage"] = total_usage
-            if estimate_cost:
-                model = getattr(self.llm, "model_name", "mistral-large-latest")
+            if estimate_cost is not None:
+                model = getattr(self.llm, "model_name", "")
                 metadata["cost_usd"] = estimate_cost(total_usage, model=model)
 
         if trace_hooks and TRACING_AVAILABLE:

@@ -6,6 +6,8 @@ Persistent session storage using SQLite. No external dependencies beyond stdlib.
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -27,15 +29,29 @@ class SQLiteSession:
 
         Args:
             session_id: Unique session identifier
-            db_path: Path to SQLite file (default: :memory: or ./agentensemble_sessions.db)
+            db_path: Path to SQLite file (default: ./agentensemble_sessions.db)
         """
         self.session_id = session_id
         self._db_path = db_path or str(Path.cwd() / "agentensemble_sessions.db")
         self._init_db()
 
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Open a connection, commit on success, roll back on error, and always close it.
+
+        ``with sqlite3.connect(...)`` alone only manages the transaction; it does not close the
+        connection, which leaks a file handle per call.
+        """
+        conn = sqlite3.connect(self._db_path)
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
         """Create table if not exists."""
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS session_messages (
@@ -52,7 +68,7 @@ class SQLiteSession:
 
     def get_messages(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Retrieve conversation history. Latest N if limit set."""
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.execute(
                 "SELECT role, content, tool_call_id, tool_calls FROM session_messages "
@@ -74,7 +90,7 @@ class SQLiteSession:
 
     def add_messages(self, messages: list[dict[str, Any]]) -> None:
         """Append messages to history."""
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             cur = conn.execute(
                 "SELECT COALESCE(MAX(seq), 0) FROM session_messages WHERE session_id = ?",
                 (self.session_id,),
@@ -83,7 +99,8 @@ class SQLiteSession:
             for i, m in enumerate(messages):
                 tc = json.dumps(m["tool_calls"]) if m.get("tool_calls") else None
                 conn.execute(
-                    "INSERT INTO session_messages (session_id, seq, role, content, tool_call_id, tool_calls) "
+                    "INSERT INTO session_messages "
+                    "(session_id, seq, role, content, tool_call_id, tool_calls) "
                     "VALUES (?, ?, ?, ?, ?, ?)",
                     (
                         self.session_id,
@@ -97,7 +114,7 @@ class SQLiteSession:
 
     def clear(self) -> None:
         """Clear all messages for this session."""
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 "DELETE FROM session_messages WHERE session_id = ?",
                 (self.session_id,),

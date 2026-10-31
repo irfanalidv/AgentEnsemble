@@ -43,7 +43,8 @@ class RunConfig:
     trace_hooks: Optional["TraceHooks"] = None
     interrupt_before_tools: list[str] | None = None
     max_retries: int = 0
-    retry_on: tuple = (Exception,)  # Exception types to retry (e.g. (RateLimitError, TimeoutError))
+    #: Exception types to retry, e.g. ``(RateLimitError, TimeoutError)``.
+    retry_on: tuple[type[BaseException], ...] = (Exception,)
     context: dict[str, Any] = field(default_factory=dict)
 
 
@@ -98,9 +99,9 @@ class Runner:
         merged_kwargs = {**config.context, **kwargs}
         merged_kwargs["run_config"] = config
         if config.session and hasattr(agent, "session"):
+            # Agents that support sessions (e.g. ReActAgent) read ``session`` from kwargs,
+            # so the same agent instance can serve several sessions.
             merged_kwargs.setdefault("session", config.session)
-        elif config.session:
-            agent = _inject_session(agent, config.session)
 
         if config.hooks and config.hooks.on_start:
             config.hooks.on_start(input, merged_kwargs)
@@ -118,15 +119,7 @@ class Runner:
                     config.hooks.on_error(e)
                 if attempt == config.max_retries:
                     raise
-                retryable = any(isinstance(e, t) for t in config.retry_on)
-                if not retryable:
+                if not isinstance(e, config.retry_on):
                     raise
 
         raise last_error or RuntimeError("Unexpected error")
-
-
-def _inject_session(agent: Any, session: Session) -> Any:
-    """Inject session into agent if it supports it."""
-    if hasattr(agent, "session"):
-        agent.session = session
-    return agent
