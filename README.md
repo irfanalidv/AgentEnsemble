@@ -2,519 +2,255 @@
 
 # AgentEnsemble
 
-**Build, orchestrate, trace, and test multi-agent LLM systems in Python.**
-
-ReAct, RAG, router, planner, workflow graphs, swarms, debates, and pipelines, with sessions,
-tracing, retries, and human-in-the-loop approval built in.
+**Build, orchestrate, trace, and test multi-agent LLM systems in Python, with OpenAI or Mistral.**
 
 [![PyPI version](https://img.shields.io/pypi/v/agentensemble.svg)](https://pypi.org/project/agentensemble/)
 [![Python versions](https://img.shields.io/pypi/pyversions/agentensemble.svg)](https://pypi.org/project/agentensemble/)
-[![Tests](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/tests.yml/badge.svg)](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/tests.yml)
-[![PyPI Downloads](https://static.pepy.tech/badge/agentensemble)](https://pepy.tech/projects/agentensemble)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/agentensemble)](https://pepy.tech/projects/agentensemble)
+[![Tests](https://img.shields.io/github/actions/workflow/status/irfanalidv/AgentEnsemble/tests.yml?branch=main&label=tests)](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/tests.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/irfanalidv/AgentEnsemble/codeql.yml?branch=main&label=CodeQL)](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/pypi/l/agentensemble.svg)](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![typed: mypy](https://img.shields.io/badge/typed-mypy-blue.svg)](https://mypy-lang.org/)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/irfanalidv/AgentEnsemble/blob/main/CONTRIBUTING.md)
 
 </div>
 
----
+## Why AgentEnsemble
 
-AgentEnsemble is a framework for building and orchestrating AI agent systems, designed for clarity,
-extensibility, and production use. It covers similar ground to LangGraph, CrewAI, and AutoGen.
+Most agent projects need the same handful of pieces: a tool-calling loop, a way to combine
+several agents, memory between turns, a pause before risky actions, and visibility into tokens
+and cost. AgentEnsemble gives you those pieces as small, plain-Python classes behind one
+`run()` / `arun()` interface, so you can start with one agent and grow into routers, pipelines,
+swarms and debates without changing how you call them. LangChain is used only inside the LLM
+providers; agents, tools and results are your own objects and plain dicts.
 
-## Installation
+## Features
+
+| Area | What you get |
+| --- | --- |
+| **Agents** | `ReActAgent` (native tool calling), `HybridAgent` (search → RAG → validate), `RAGAgent`, `StructuredAgent` (Pydantic output), `StateGraphAgent`, `RouterAgent`, `PlannerAgent` |
+| **Orchestration** | `Ensemble` with supervisor / swarm (parallel) / pipeline modes, `DebateOrchestrator`, `WorkflowGraph` with conditional edges |
+| **Tools** | `@function_tool` (JSON schema from type hints), `SearchTool` (Serper or DuckDuckGo), `RAGTool` (URLs or local text), `ScraperTool` (httpx or Playwright), `ValidationTool`, `ToolRegistry` |
+| **LLM providers** | OpenAI and Mistral built in, picked from the environment (OpenAI first); any `LLMProvider` subclass works |
+| **Runtime** | `Runner` + `RunConfig`: sessions (`InMemorySession`, `SQLiteSession`), retries, lifecycle hooks, human-in-the-loop interrupts |
+| **Observability** | `TraceHooks` events for runs, LLM calls and tools, token usage, cost estimates, `astream()` events for UIs |
+| **Evaluation** | `AgentComparison`, `Benchmark`, `Metrics` to compare agents on the same tasks |
+| **Quality** | Typed (`py.typed`, mypy-clean), tested with fake LLMs (no network in CI), Python 3.10 to 3.13 |
+
+## Install
 
 ```bash
-pip install agentensemble                 # core: agents, orchestration, graphs, memory, tracing
-pip install "agentensemble[search]"       # + DuckDuckGo / Serper web search for SearchTool
-pip install "agentensemble[rag]"          # + Chroma, sentence-transformers, loaders for RAGTool
-pip install "agentensemble[observability]" # + LangSmith / OpenTelemetry
-pip install "agentensemble[all]"          # everything above
+pip install agentensemble            # or: uv add agentensemble
 ```
 
-Requires Python 3.10+.
+| Extra | Adds | Install |
+| --- | --- | --- |
+| `search` | DuckDuckGo (`ddgs`) and Serper backends for `SearchTool` | `pip install "agentensemble[search]"` |
+| `rag` | Chroma, sentence-transformers, text splitters, BeautifulSoup for `RAGTool` | `pip install "agentensemble[rag]"` |
+| `observability` | LangSmith and OpenTelemetry API | `pip install "agentensemble[observability]"` |
+| `all` | All of the above | `pip install "agentensemble[all]"` |
 
-## Quick start (no API key needed)
+## Quickstart
 
-Graph workflows, state-graph agents, and the planner run without any LLM:
+Needs `OPENAI_API_KEY` (or `MISTRAL_API_KEY`) in the environment or a `.env` file.
+
+```python
+from agentensemble import ReActAgent, function_tool
+
+
+@function_tool(description="Look up the shipping status of an order by id")
+def order_status(order_id: str) -> str:
+    return {"A100": "shipped", "B200": "processing"}.get(order_id, "not found")
+
+
+agent = ReActAgent(tools=[order_status])  # OpenAI if OPENAI_API_KEY is set, else Mistral
+result = agent.run("Has order A100 shipped yet?")
+print(result["result"])
+print(result["metadata"])
+```
+
+Output from a run with `gpt-4.1-mini` (model wording varies):
+
+```text
+Yes, order A100 has shipped.
+{'iterations': 1, 'tool_calls': 1, 'agent': 'react_agent', 'total_usage': {'input_tokens': 439, 'output_tokens': 24, 'total_tokens': 463}, 'cost_usd': 0.00021400000000000002}
+```
+
+No key yet? Graph workflows run without an LLM, and every script in
+[`examples/`](https://github.com/irfanalidv/AgentEnsemble/tree/main/examples) marked "offline"
+runs with a built-in rule-based stand-in model:
 
 ```python
 from agentensemble import WorkflowGraph
 
-
-def analyze(s):
-    return {"context": {**s.get("context", {}), "done": True}, "current_node": "summarize"}
-
-
-def summarize(s):
-    return {"result": f"Summary for: {s['query']}", "current_node": "end"}
-
-
 graph = (
-    WorkflowGraph(entry="start", exit_nodes=["end"])
-    .add_node("start", lambda s: {"current_node": "analyze"})
-    .add_node("analyze", analyze)
-    .add_node("summarize", summarize)
-    .add_edge("start", "analyze")
-    .add_edge("analyze", "summarize")
-    .add_edge("summarize", "end")
+    WorkflowGraph(entry="classify")
+    .add_node("classify", lambda s: {"context": {"refund": "refund" in s["query"].lower()}})
+    .add_node("refund", lambda s: {"result": "Routed to the refunds team"})
+    .add_node("general", lambda s: {"result": "Routed to general support"})
+    .add_edge("classify", "refund", lambda s: s["context"]["refund"])
+    .add_edge("classify", "general")
 )
-print(graph.run("What is multi-agent AI?")["result"])
-# Summary for: What is multi-agent AI?
+out = graph.run("I want a refund for my order")
+print(out["result"], out["metadata"]["nodes_visited"])
+# Routed to the refunds team ['classify', 'refund']
 ```
 
-LLM-powered agents (`ReActAgent`, `HybridAgent`, `RouterAgent`, `StructuredAgent`) work with
-**OpenAI** or **Mistral**. The provider is picked from your environment: OpenAI if
-`OPENAI_API_KEY` is set, otherwise Mistral if `MISTRAL_API_KEY` is set. You can also pass any
-`LLMProvider` explicitly via `llm=...`:
+## How it works
 
-```python
-from agentensemble import ReActAgent
-from agentensemble.llm import OpenAILLMProvider, MistralLLMProvider
-
-agent = ReActAgent(tools=[...], llm=OpenAILLMProvider(model="gpt-4.1-mini"))
-agent = ReActAgent(tools=[...], llm=MistralLLMProvider(model="mistral-small-latest"))
+```mermaid
+flowchart LR
+    App["Your code"] --> Runner["Runner.run / arun<br/>RunConfig: session, retries,<br/>hooks, interrupts"]
+    Runner --> Orchestration["Ensemble · DebateOrchestrator<br/>RouterAgent · PlannerAgent"]
+    Runner --> Agent
+    Orchestration -->|"agent.arun(query)"| Agent["Agents<br/>ReActAgent · HybridAgent<br/>RAGAgent · StructuredAgent"]
+    Agent -->|"LLMMessage list + ToolSchema list"| Provider["LLMProvider<br/>OpenAILLMProvider · MistralLLMProvider<br/>or your own"]
+    Provider -->|"LLMResponse: content / tool_calls / usage"| Agent
+    Agent -->|"ainvoke_tool(name, args)"| Tools["Tools<br/>@function_tool · SearchTool · RAGTool<br/>ScraperTool · ValidationTool"]
+    Agent <-->|"load / save turn"| Session["Session<br/>InMemorySession · SQLiteSession"]
+    Agent -->|"TraceEvent"| Trace["TraceHooks<br/>usage · cost · timings"]
 ```
 
-## Configuration
+One `ReActAgent` turn, including the optional human approval step:
 
-| Variable | Purpose |
-| --- | --- |
-| `OPENAI_API_KEY` | Enables the OpenAI provider (preferred when set). |
-| `OPENAI_MODEL` | Optional default model for `OpenAILLMProvider` (default: `gpt-4.1-mini`). Reasoning models such as `gpt-5-mini` work too; temperature is left at the API default for them. |
-| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint (Azure OpenAI proxy, vLLM, LM Studio, ...). |
-| `MISTRAL_API_KEY` | Enables the Mistral provider (used when no OpenAI key is set). |
-| `MISTRAL_MODEL` | Optional default model for `MistralLLMProvider` (default: `mistral-large-latest`). Use e.g. `mistral-small-latest` if your plan doesn't include the large model. |
-| `AGENTENSEMBLE_LLM_PROVIDER` | Optional. Force `openai` or `mistral` when both keys are set. |
-| `SERPER_API_KEY` | Optional. When set, `SearchTool()` uses Serper; otherwise it falls back to DuckDuckGo (needs the `search` extra). |
+```mermaid
+sequenceDiagram
+    participant R as Runner
+    participant A as ReActAgent
+    participant S as Session
+    participant L as LLMProvider
+    participant T as Tool
+    R->>A: arun(query, run_config, session)
+    A->>S: get_messages(limit=20)
+    A->>L: agenerate(system + history + query, tools)
+    L-->>A: tool_calls
+    alt tool listed in interrupt_before_tools
+        A-->>R: {"__interrupted__": True, "run_state", "pending_tool"}
+        R->>A: arun(..., resume=run_state, resume_value=approved_result)
+    else
+        A->>T: ainvoke_tool(name, arguments)
+        T-->>A: result (errors are returned as text)
+    end
+    A->>L: agenerate(... + tool results), no tools
+    L-->>A: final answer
+    A->>S: add_messages(user, tool exchange, answer)
+    A-->>R: {"result": ..., "metadata": {iterations, tool_calls, total_usage, cost_usd}}
+```
 
-Copy `.env.example` to `.env` and fill in your keys (`KEY=value`, no spaces around `=`); the
-package loads `.env` automatically via `python-dotenv`.
+**Design decisions**
 
-Without an API key, LLM agents can still be constructed (and inspected or registered); calling
-`run()` raises a clear `RuntimeError` explaining how to configure an LLM.
+- **One provider interface.** Agents only see `LLMProvider.generate` / `agenerate` and Pydantic
+  message models (`agentensemble/llm/interface.py`). The OpenAI and Mistral providers share
+  one LangChain adapter (`llm/langchain_base.py`); adding a provider means subclassing
+  `LLMProvider` or `LangChainChatProvider`.
+- **Native tool calling.** Tools are described by JSON schemas (inferred from type hints by
+  `@function_tool`) and called through the model's function-calling API, not parsed from text.
+- **Bounded tool use per turn.** After the first round of tool results in a turn, the model is
+  asked to answer without tools. This keeps cost and latency predictable; `max_iterations`
+  caps the loop as well.
+- **Async first.** Every agent has `arun()`; `run()` wraps it with `asyncio.run()`. Providers
+  rebuild their HTTP client when used on a new event loop, so repeated sync calls work.
+- **Plain results.** Agents return `{"result": str, "metadata": dict}`. The human-in-the-loop
+  `run_state` is a JSON-serialisable dict, so a paused run can be stored and resumed later.
+- **Usable without keys.** LLM agents can be constructed, inspected and registered without an
+  API key; `run()` raises a clear `RuntimeError` until a provider is configured.
 
----
+<details>
+<summary>Module map</summary>
 
-## Design Philosophy
-
-- **Modular** — Agents, tools, orchestration, and memory are decoupled
-- **Async-first** — `run()` and `arun()` on all agents; parallel execution via `asyncio.gather`
-- **Provider-agnostic** — one LLM interface, OpenAI and Mistral built in
-- **Production patterns** — Runner, retries, hooks, tracing, session memory
-
----
-
-## Architecture
+```text
+agentensemble/
+├── agents/         ReActAgent, HybridAgent, RAGAgent, StateGraphAgent, StructuredAgent, BaseAgent
+├── llm/            LLMProvider, OpenAILLMProvider, MistralLLMProvider, get_default_provider
+├── tools/          @function_tool, SearchTool, RAGTool, ScraperTool, ValidationTool, ToolRegistry
+├── orchestration/  Ensemble, Supervisor/Swarm/PipelineOrchestrator, DebateOrchestrator
+├── router/         RouterAgent (LLM picks an agent via a constrained tool call)
+├── planner/        PlannerAgent (rule-based decomposition; override _decompose for LLM planning)
+├── graph/          WorkflowGraph, Edge
+├── memory/         Session protocol, InMemorySession, SQLiteSession
+├── tracing/        TraceHooks, TraceEvent, estimate_cost
+├── testing/        AgentComparison, Benchmark, Metrics
+├── utils/          get_chat_model, get_default_embeddings, provider helpers
+└── runner.py       Runner, RunConfig, RunHooks
+```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/irfanalidv/AgentEnsemble/main/docs/agentensemble-architecture.png" alt="AgentEnsemble Architecture" width="900"/>
+  <img src="https://raw.githubusercontent.com/irfanalidv/AgentEnsemble/main/docs/agentensemble-architecture.png" alt="AgentEnsemble components" width="820"/>
 </p>
 
-### Framework layers
+</details>
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│                              AgentEnsemble — Layered Architecture                          │
-├─────────────────┬─────────────────────┬─────────────────────┬────────────────────────────┤
-│     AGENTS      │   ORCHESTRATION      │       TOOLS         │    MEMORY & RUNNER          │
-├─────────────────┼─────────────────────┼─────────────────────┼────────────────────────────┤
-│ ReActAgent      │ Supervisor          │ SearchTool          │ Session (InMemory, SQLite)  │
-│ StateGraphAgent │ Swarm (parallel)    │ RAGTool             │ RunConfig, RunHooks        │
-│ RAGAgent        │ Pipeline (seq)     │ @function_tool      │ TraceHooks (usage, cost)    │
-│ HybridAgent     │ Debate (consensus)  │ ValidationTool      │ interrupt_before_tools      │
-│ RouterAgent     │ Ensemble + Router   │ ToolRegistry         │ retries, session memory     │
-│ PlannerAgent    │ WorkflowGraph       │                     │                             │
-└─────────────────┴─────────────────────┴─────────────────────┴────────────────────────────┘
-         │                    │                    │                         │
-         └────────────────────┴────────────────────┴─────────────────────────┘
-                                          │
-                              ┌───────────▼───────────┐
-                              │   Use Case Spectrum   │
-                              └───────────────────────┘
-```
+## Use cases and examples
 
-### Use case spectrum
+Runnable scripts in [`examples/`](https://github.com/irfanalidv/AgentEnsemble/tree/main/examples).
+The first four run offline (no key) and switch to OpenAI or Mistral when a key is set; pass
+`--offline` to force offline mode.
 
-| Layer | Use cases |
-|-------|-----------|
-| **Research & fact-checking** | ReActAgent + SearchTool; Swarm for parallel verification |
-| **Document Q&A** | RAGAgent + RAGTool; index URLs, ask questions |
-| **Multi-agent coordination** | Supervisor, Swarm, Pipeline; RouterAgent for LLM-based selection |
-| **Debate & consensus** | DebateOrchestrator; solvers propose → aggregator votes |
-| **Custom workflows** | WorkflowGraph (DAG), StateGraphAgent (nodes), PlannerAgent (decompose) |
-| **Human-in-loop** | `interrupt_before_tools` — pause before sensitive tools, resume with approval |
-| **Production pipelines** | Runner + RunConfig, retries, TraceHooks (usage/cost), Session memory |
+| Script | Use case | Needs |
+| --- | --- | --- |
+| [`customer_support_rag.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/customer_support_rag.py) | Answer customer questions from a help-center FAQ with `RAGTool.index_texts` and `ReActAgent` | `[rag]` extra; offline |
+| [`support_ticket_triage.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/support_ticket_triage.py) | Route tickets with `WorkflowGraph`; a `ValidationTool` gate escalates bad refund replies | offline |
+| [`order_assistant_approval.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/order_assistant_approval.py) | Order bot with `SQLiteSession` memory, `TraceHooks`, and human approval before refunds | offline |
+| [`sales_csv_analyst.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/sales_csv_analyst.py) | Answer revenue questions over a CSV with deterministic `@function_tool` analytics | offline |
+| [`graph_workflow_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/graph_workflow_example.py), [`runner_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/runner_example.py), [`research_agent_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/research_agent_example.py) | Graphs, `Runner` hooks, planner → router → executor | offline |
+| [`react_llm_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/react_llm_example.py), [`swarm_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/swarm_example.py), [`debate_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/debate_example.py), [`streaming_example.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/streaming_example.py), [`showcase_all.py`](https://github.com/irfanalidv/AgentEnsemble/blob/main/examples/showcase_all.py) | Search agents, parallel swarm, debate, streaming events, full tour | API key (+ `[search]`) |
 
----
+<details>
+<summary>Recipes (need <code>OPENAI_API_KEY</code> or <code>MISTRAL_API_KEY</code>)</summary>
 
-## LLM quick start
-
-```bash
-pip install "agentensemble[search]"
-export OPENAI_API_KEY=...      # or: export MISTRAL_API_KEY=...
-```
+**Human approval before a sensitive tool**
 
 ```python
-from agentensemble import ReActAgent, SearchTool, Runner
+from agentensemble import ReActAgent, RunConfig, Runner, function_tool
 
-agent = ReActAgent(name="research", tools=[SearchTool()], max_iterations=5)
-result = Runner.run(agent, "What are the latest AI breakthroughs in 2024?")
-print(result["result"])
-```
 
-**Setup:** Copy `.env.example` to `.env` and add your keys. Use `KEY=value` format (no spaces around `=`).
-
----
-
-## Examples — Code + Output
-
-Each example is runnable. Requires `OPENAI_API_KEY` or `MISTRAL_API_KEY` (and the `search` extra for `SearchTool`; `SERPER_API_KEY` is optional). Outputs below are from the author's runs; LLM answers will vary.
-
----
-
-### 1. ReActAgent — LLM decides when to search
-
-```python
-from agentensemble import ReActAgent, SearchTool
-
-agent = ReActAgent(name="research", tools=[SearchTool()], max_iterations=5)
-result = agent.run("Who won the 2024 Nobel Prize in Physics?")
-print(result["result"])
-```
-
-**Output:**
-
-```
-The 2024 Nobel Prize in Physics was awarded jointly to John J. Hopfield and
-Geoffrey E. Hinton for their foundational discoveries and inventions that
-enable machine learning with artificial neural networks.
-```
-
----
-
-### 2. Custom @function_tool — Add your own tools
-
-```python
-from agentensemble import ReActAgent, SearchTool, function_tool
-
-
-@function_tool(description="Get current weather for a city")
-def get_weather(city: str) -> str:
-    return f"Weather in {city}: 72°F, partly cloudy"
-
-
-agent = ReActAgent(tools=[SearchTool(), get_weather], max_iterations=4)
-result = agent.run("What is the weather in Paris?")
-print(result["result"])
-```
-
-**Output:**
-
-```
-The current weather in Paris is 72°F (22°C) with partly cloudy conditions.
-```
-
----
-
-### 3. HybridAgent — LLM routes SEARCH → RAG → VALIDATE → ANSWER
-
-```python
-from agentensemble import HybridAgent, SearchTool
-
-agent = HybridAgent(tools=[SearchTool()], max_iterations=5)
-result = agent.run("What are the key trends in AI agents in 2024?")
-print(result["result"][:300], "...")
-print("Actions:", result["metadata"]["actions_taken"])
-```
-
-**Output:**
-
-```
-1. Multi-Modal AI Models Redefined Possibilities · 2. AI Agents Stepping Into
-the Spotlight · 3. AI's Bold Move into Video Creation · 4. Rise of Open-Source AI...
-Actions: ['SEARCH', 'SEARCH', 'RAG', 'VALIDATE', 'ANSWER']
-```
-
----
-
-### 4. Swarm — Parallel agents (multiple perspectives)
-
-```python
-from agentensemble import ReActAgent, SwarmOrchestrator, SearchTool
-
-researcher = ReActAgent(name="researcher", tools=[SearchTool()], max_iterations=2)
-fact_checker = ReActAgent(name="fact_checker", tools=[SearchTool()], max_iterations=2)
-
-swarm = SwarmOrchestrator(agents={"researcher": researcher, "fact_checker": fact_checker})
-result = swarm.perform("What is the capital of France?")
-for name, r in result["results"].items():
-    print(f"{name}: {r['result'][:80]}...")
-```
-
-**Output:**
-
-```
-researcher: The capital of France is Paris.
-fact_checker: The capital of France is Paris.
-```
-
----
-
-### 5. Pipeline — Sequential (search → summarize)
-
-```python
-from agentensemble import ReActAgent, PipelineOrchestrator, SearchTool
-
-searcher = ReActAgent(name="searcher", tools=[SearchTool()], max_iterations=2)
-summarizer = ReActAgent(name="summarizer", tools=[], max_iterations=1)
-
-pipeline = PipelineOrchestrator(agents={"searcher": searcher, "summarizer": summarizer})
-result = pipeline.perform("Summarize the top 3 AI breakthroughs in 2024")
-print(result["final_result"]["previous_result"][:250], "...")
-```
-
-**Output:**
-
-```
-1. Multimodal AI Advancements (GPT-4o, Gemini 1.5) · 2. AI Agents Stepping Into
-the Spotlight · 3. AI's Bold Move into Video Creation...
-```
-
----
-
-### 6. Debate — Multi-agent consensus for reasoning
-
-```python
-from agentensemble import ReActAgent, DebateOrchestrator
-
-solver1 = ReActAgent(name="solver_1", tools=[], max_iterations=1)
-solver2 = ReActAgent(name="solver_2", tools=[], max_iterations=1)
-aggregator = ReActAgent(name="aggregator", tools=[], max_iterations=1)
-
-debate = DebateOrchestrator(solvers=[solver1, solver2], aggregator=aggregator, rounds=2)
-result = debate.debate("What is 15 * 7?")
-print("Proposals:", result["proposals"])
-print("Final:", result["result"])
-```
-
-**Output:**
-
-```
-Proposals: ['15 × 7 = 105', '15 × 7 equals 105']
-Final: 15 × 7 equals 105.
-```
-
----
-
-### 7. Router + Ensemble — LLM picks the best agent
-
-```python
-from agentensemble import ReActAgent, RouterAgent, Ensemble, SearchTool
-
-researcher = ReActAgent(name="researcher", tools=[SearchTool()], max_iterations=2)
-validator = ReActAgent(name="validator", tools=[SearchTool()], max_iterations=2)
-
-router = RouterAgent(agents={"researcher": researcher, "validator": validator})
-ensemble = Ensemble(
-    conductor="supervisor", agents={"researcher": researcher, "validator": validator}, router=router
-)
-result = ensemble.perform("Latest developments in quantum computing")
-for name, r in result["results"].items():
-    print(f"Routed to {name}: {r['result'][:120]}...")
-```
-
-**Output:**
-
-```
-Routed to researcher: Here are the latest developments in quantum computing:
-1. Hardware Advances · 2. Fault-tolerant quantum computing...
-```
-
----
-
-### 8. Planner — Decompose task → executor runs subtasks
-
-```python
-from agentensemble import PlannerAgent, StateGraphAgent
-
-
-def worker(state):
-    return {"result": f"Processed: {state.query}"}
-
-
-executor = StateGraphAgent(name="worker", nodes={"start": worker})
-executor._route = lambda s, c: "end"
-
-planner = PlannerAgent(executor=executor, max_subtasks=3)
-result = planner.run("Research and compare LangGraph vs CrewAI")
-print("Subtasks:", result["metadata"]["subtasks"])
-print("Result:", result["result"][:200], "...")
-```
-
-**Output:**
-
-```
-Subtasks: ['Search for information about: Research and compare LangGraph vs CrewAI',
-           'Summarize key findings from: Research and compare LangGraph vs CrewAI']
-Result: Processed: Search for information... --- Processed: Summarize key findings...
-```
-
----
-
-### 9. WorkflowGraph — Custom DAG with nodes and edges
-
-```python
-from agentensemble import WorkflowGraph
-
-
-def analyze(s):
-    return {"context": {**s.get("context", {}), "done": True}, "current_node": "summarize"}
-
-
-def summarize(s):
-    return {"result": f"Summary for: {s['query']}", "current_node": "end"}
-
-
-graph = (
-    WorkflowGraph(entry="start", exit_nodes=["end"])
-    .add_node("start", lambda s: {"current_node": "analyze"})
-    .add_node("analyze", analyze)
-    .add_node("summarize", summarize)
-    .add_edge("start", "analyze")
-    .add_edge("analyze", "summarize")
-    .add_edge("summarize", "end")
-)
-result = graph.run("What is multi-agent AI?")
-print(result["result"])
-```
-
-**Output:**
-
-```
-Summary for: What is multi-agent AI?
-```
-
----
-
-### 10. Runner + RunHooks + InMemorySession — Production-ready execution
-
-```python
-from agentensemble import ReActAgent, Runner, RunConfig, RunHooks, InMemorySession, SearchTool
-
-session = InMemorySession(session_id="chat-1")
-agent = ReActAgent(name="chatbot", tools=[SearchTool()], session=session, max_iterations=3)
-
-
-def on_start(q, _):
-    print(f"→ User: {q[:50]}...")
-
-
-def on_end(r):
-    print(f"← Agent: {r['result'][:80]}...\n")
-
-
-config = RunConfig(hooks=RunHooks(on_start=on_start, on_end=on_end))
-
-Runner.run(agent, "What is the capital of Japan?", config=config)
-Runner.run(agent, "What about its population?", config=config)  # Remembers context
-```
-
-**Output:**
-
-```
-→ User: What is the capital of Japan?...
-← Agent: The capital of Japan is Tokyo.
-
-→ User: What about its population?...
-← Agent: Tokyo's population is approximately 14 million...
-```
-
----
-
-### 11. TraceHooks — Observability, token usage, cost estimation
-
-```python
-from agentensemble import ReActAgent, Runner, RunConfig, TraceHooks, SearchTool
-
-agent = ReActAgent(name="research", tools=[SearchTool()], max_iterations=3)
-hooks = TraceHooks()
-
-config = RunConfig(trace_hooks=hooks)
-result = Runner.run(agent, "Who won the 2024 Nobel Prize in Physics?", config=config)
-
-print(result["result"][:100], "...")
-print("Usage:", result["metadata"].get("total_usage"))
-print("Cost (USD):", result["metadata"].get("cost_usd"))
-print("Events:", [e.type.value for e in hooks.events])
-```
-
-**Output:**
-
-```
-The 2024 Nobel Prize in Physics was awarded jointly to John J. Hopfield and Geoffrey E. Hinton...
-Usage: {'input_tokens': 1247, 'output_tokens': 89, 'total_tokens': 1336}
-Cost (USD): 0.00293
-Events: ['run_start', 'llm_start', 'llm_end', 'tool_start', 'tool_end', 'llm_start', 'llm_end', 'run_end']
-```
-
----
-
-### 12. Human-in-loop — Pause before sensitive tools, resume with approval
-
-```python
-from agentensemble import ReActAgent, Runner, RunConfig, function_tool
-
-
-@function_tool(description="Execute a payment")
+@function_tool(description="Send money to a recipient")
 def execute_payment(amount: float, recipient: str) -> str:
-    return f"Paid ${amount} to {recipient}"
+    return f"Paid ${amount:.2f} to {recipient}"
 
 
-agent = ReActAgent(tools=[execute_payment], max_iterations=2)
+agent = ReActAgent(tools=[execute_payment])
 config = RunConfig(interrupt_before_tools=["execute_payment"])
 
 result = Runner.run(agent, "Pay $50 to Alice", config=config)
-
 if result.get("__interrupted__"):
-    print("Paused for approval:", result["pending_tool"])
-    # Simulate human approval
+    pending = result["pending_tool"]  # {'name': 'execute_payment', 'arguments': {...}}
+    approved = execute_payment.run(**pending["arguments"])  # after a human says yes
     result = Runner.run(
-        agent, "...", config=config, resume=result["run_state"], resume_value="Paid $50 to Alice"
+        agent,
+        "Pay $50 to Alice",
+        config=config,
+        resume=result["run_state"],
+        resume_value=approved,
     )
 print(result["result"])
 ```
 
-**Output:**
-
-```
-Paused for approval: {'name': 'execute_payment', 'arguments': {'amount': 50.0, 'recipient': 'Alice'}}
-Paid $50 to Alice
-```
-
----
-
-### 13. RAGAgent — Document Q&A (optional: `pip install agentensemble[rag]`)
+**Multi-turn memory**
 
 ```python
-from agentensemble import RAGAgent, RAGTool
+from agentensemble import InMemorySession, ReActAgent, RunConfig, Runner
 
-rag_tool = RAGTool()
-rag_tool.index_documents(["https://example.com/doc"])  # Index from URLs
-
-agent = RAGAgent(name="doc_qa", tools=[rag_tool], fallback_strategies=2)
-result = agent.run("What is task decomposition?")
-print(result["result"][:200], "...")
+agent = ReActAgent(name="chatbot")
+config = RunConfig(session=InMemorySession("chat-1"))  # or SQLiteSession("chat-1", db_path=...)
+Runner.run(agent, "My name is Priya and I live in Lisbon.", config=config)
+print(Runner.run(agent, "Which city do I live in?", config=config)["result"])  # ... Lisbon.
 ```
 
-**Output:**
-```
-Task decomposition is the process of breaking complex tasks into smaller,
-manageable subtasks that can be executed by specialized agents...
+**Route to the right specialist**
+
+```python
+from agentensemble import ReActAgent, RouterAgent
+
+router = RouterAgent(
+    agents={"billing": ReActAgent(name="billing"), "tech_support": ReActAgent(name="tech_support")}
+)
+out = router.run("I was charged twice for my subscription this month")
+print(out["metadata"]["routed_to"])  # billing
 ```
 
----
-
-### 14. StructuredAgent — Pydantic output (optional: `langchain>=1.1`)
+**Structured output**
 
 ```python
 from pydantic import BaseModel, Field
@@ -528,192 +264,131 @@ class ProductReview(BaseModel):
 
 
 agent = StructuredAgent(response_format=ProductReview)
-result = agent.run("Review: iPhone 15 Pro - 5 stars, excellent camera and battery")
+result = agent.run("Review: Acme X1 headphones - 4 stars, great sound, short battery life")
 print(result["structured_response"])
+# product='Acme X1 headphones' rating=4 summary='Great sound quality but battery life is short.'
 ```
 
-**Output:**
-```
-ProductReview(product='iPhone 15 Pro', rating=5, summary='Excellent camera and battery')
-```
-
----
-
-### Creative combo — Research pipeline (Planner + Swarm + Debate + Runner)
+**Parallel swarm and debate** (`ReActAgent(tools=[])` answers from the model alone)
 
 ```python
-from agentensemble import (
-    ReActAgent,
-    PlannerAgent,
-    StateGraphAgent,
-    SwarmOrchestrator,
-    DebateOrchestrator,
-    Runner,
-    RunConfig,
-    RunHooks,
-    SearchTool,
+from agentensemble import DebateOrchestrator, ReActAgent, SwarmOrchestrator
+
+swarm = SwarmOrchestrator(
+    agents={"optimist": ReActAgent(name="optimist"), "skeptic": ReActAgent(name="skeptic")}
 )
+views = swarm.perform("Should a 5-person startup self-host its LLM?")
 
-# 1. Executor: ReActAgent with search
-executor = ReActAgent(name="researcher", tools=[SearchTool()], max_iterations=3)
-
-# 2. Planner decomposes → runs subtasks via executor
-planner = PlannerAgent(executor=executor, max_subtasks=2)
-plan_result = planner.run("Compare LangGraph vs CrewAI vs AutoGen")
-
-# 3. Swarm: parallel research + fact-check
-researcher = ReActAgent(name="r", tools=[SearchTool()], max_iterations=2)
-checker = ReActAgent(name="c", tools=[SearchTool()], max_iterations=2)
-swarm = SwarmOrchestrator(agents={"r": researcher, "c": checker})
-swarm_result = swarm.perform("Top 3 AI agent frameworks 2024")
-
-# 4. Debate: consensus on a fact
-s1 = ReActAgent(name="s1", tools=[], max_iterations=1)
-s2 = ReActAgent(name="s2", tools=[], max_iterations=1)
-agg = ReActAgent(name="agg", tools=[], max_iterations=1)
-debate = DebateOrchestrator(solvers=[s1, s2], aggregator=agg, rounds=2)
-debate_result = debate.debate("What is 12 * 8?")
-
-# 5. Runner with hooks
-hooks = RunHooks(on_start=lambda q, _: print(f"Running: {q[:40]}..."))
-result = Runner.run(executor, "Who won 2024 Nobel Physics?", RunConfig(hooks=hooks))
-
-print("Planner:", plan_result["result"][:100], "...")
-print("Swarm agents:", list(swarm_result["results"].keys()))
-print("Debate answer:", debate_result["result"])
-print("Runner:", result["result"][:80], "...")
+debate = DebateOrchestrator(
+    solvers=[ReActAgent(name="s1"), ReActAgent(name="s2")],
+    aggregator=ReActAgent(name="judge"),
+    rounds=2,
+)
+print(debate.debate("A bat and a ball cost $1.10; the bat costs $1 more. Ball price?")["result"])
 ```
 
-**Output:**
+**Tracing, usage and cost**
 
-```
-Running: Who won 2024 Nobel Physics?...
-Planner: Processed: Search for information... --- Processed: Summarize key findings...
-Swarm agents: ['r', 'c']
-Debate answer: 12 × 8 equals 96.
-Runner: The 2024 Nobel Prize in Physics was awarded to John J. Hopfield and Geoffrey E. Hinton...
-```
+```python
+from agentensemble import ReActAgent, RunConfig, Runner, TraceHooks
 
----
-
-## Run full showcase
-
-```bash
-pip install agentensemble[search]
-PYTHONPATH=. python examples/showcase_all.py
+hooks = TraceHooks(on_event=lambda e: print(e.type.value, e.duration_ms))
+result = Runner.run(ReActAgent(), "Hello!", config=RunConfig(trace_hooks=hooks))
+print(result["metadata"].get("total_usage"), result["metadata"].get("cost_usd"))
 ```
 
-Runs all demos with real API calls.
+</details>
 
----
+## Configuration
 
-## Core Components
+**Environment variables** (a `.env` file in the working directory is loaded automatically; see
+[`.env.example`](https://github.com/irfanalidv/AgentEnsemble/blob/main/.env.example)):
 
-### Agents
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Enables OpenAI; preferred when set | none |
+| `OPENAI_MODEL` | Default model for `OpenAILLMProvider`. Reasoning models (`o*`, `gpt-5*`) run at the API's default temperature | `gpt-4.1-mini` |
+| `OPENAI_BASE_URL` | OpenAI-compatible endpoint (vLLM, LM Studio, proxies) | OpenAI |
+| `MISTRAL_API_KEY` | Enables Mistral; used when no OpenAI key is set | none |
+| `MISTRAL_MODEL` | Default model for `MistralLLMProvider` | `mistral-large-latest` |
+| `AGENTENSEMBLE_LLM_PROVIDER` | Force `openai` or `mistral` | auto |
+| `SERPER_API_KEY` | `SearchTool()` uses Serper when set, else DuckDuckGo | none |
 
-| Agent               | Use Case                      | LLM      |
-| ------------------- | ----------------------------- | -------- |
-| **ReActAgent**      | Research, tool use, reasoning | Yes      |
-| **StateGraphAgent** | Custom node workflows         | No       |
-| **RAGAgent**        | Document Q&A                  | Optional |
-| **HybridAgent**     | Search → RAG → Validate       | Optional |
-| **RouterAgent**     | Route to best agent           | Optional |
-| **PlannerAgent**    | Task decomposition            | No       |
+**Main options**
 
-### Orchestration
+| Where | Option | Default | Meaning |
+| --- | --- | --- | --- |
+| `ReActAgent` / `HybridAgent` | `llm=` | from env | Any `LLMProvider` instance |
+| | `max_iterations=` | 10 / 15 | Upper bound on loop steps |
+| | `session=` | `None` | Session used when none is passed via `RunConfig` |
+| `RunConfig` | `session`, `hooks`, `trace_hooks` | `None` | Memory, lifecycle callbacks, tracing |
+| | `interrupt_before_tools` | `None` | Tool names that pause the run for approval |
+| | `max_retries`, `retry_on` | `0`, `(Exception,)` | Retry policy for the whole run |
+| `RAGTool` | `embeddings=`, `vector_store=` | env provider, in-memory | Bring your own embeddings or store |
+| | `chunk_size`, `chunk_overlap`, `fetch_timeout` | 1000, 200, 30 s | Splitting and URL loading |
+| `ScraperTool` | `provider`, `timeout`, `max_chars` | `"simple"`, 15 s, 20000 | httpx or Playwright fetch |
+| `WorkflowGraph` | `entry`, `exit_nodes`, `max_steps` | `"start"`, `["end"]`, 50 | Graph execution limits |
 
-| Pattern        | Description                                                          |
-| -------------- | -------------------------------------------------------------------- |
-| **Supervisor** | Central coordinator; optional `router` for LLM-based agent selection |
-| **Swarm**      | Parallel execution via `asyncio.gather`                              |
-| **Pipeline**   | Sequential agent workflow                                            |
-| **Debate**     | Solvers propose → feedback → aggregator votes                        |
+## API overview
 
-### Tools
+| Object | Kind | Summary |
+| --- | --- | --- |
+| `ReActAgent(tools, llm, session, max_iterations)` | agent | Tool-calling loop; `run`, `arun`, `astream` |
+| `HybridAgent(tools, llm, early_stopping)` | agent | LLM (or fixed) routing over search / RAG / validate |
+| `RAGAgent(tools, fallback_strategies)` | agent | Queries a `RAGTool`, retries with query variations |
+| `StructuredAgent(response_format, model, tools)` | agent | Returns a Pydantic object in `structured_response` |
+| `StateGraphAgent(nodes)` / `WorkflowGraph(nodes, edges)` | graph | Function nodes with routing and conditional edges |
+| `RouterAgent(agents, llm)` | agent | Picks one agent per query; `route_only()` for `Ensemble` |
+| `PlannerAgent(executor, max_subtasks)` | agent | Splits a task into subtasks and runs them |
+| `Ensemble(agents, conductor, router)` | orchestration | `"supervisor"`, `"swarm"` (parallel) or `"pipeline"` |
+| `DebateOrchestrator(solvers, aggregator, rounds)` | orchestration | Proposals, refinement rounds, aggregator decision |
+| `Runner.run / arun(agent, input, config)` | runtime | Applies `RunConfig`: session, hooks, retries, interrupts |
+| `function_tool(name, description)` | tools | Decorator turning a typed function into a tool |
+| `SearchTool`, `RAGTool`, `ScraperTool`, `ValidationTool` | tools | Built-in tools |
+| `InMemorySession`, `SQLiteSession` | memory | Conversation history stores |
+| `TraceHooks`, `TraceEvent`, `estimate_cost` | tracing | Events, token usage, USD estimates from list prices |
+| `get_default_provider()`, `OpenAILLMProvider`, `MistralLLMProvider` | llm | Provider selection and implementations |
+| `AgentComparison`, `Benchmark`, `Metrics` | evaluation | Run agents on the same cases and compare |
 
-- `@function_tool` — Decorate functions for automatic schema
-- `SearchTool` — Serper or DuckDuckGo
-- `RAGTool` — Document indexing and retrieval
-- `ValidationTool` — Quality checks
-- `ToolRegistry` — Dynamic tool management
+## Research and references
 
-### Memory & Runner
+- **ReAct** (`ReActAgent`): S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. Narasimhan, Y. Cao.
+  *ReAct: Synergizing Reasoning and Acting in Language Models.* ICLR 2023. AgentEnsemble runs
+  the reason / act / observe loop through native function calling instead of text parsing.
+- **Multi-agent debate** (`DebateOrchestrator`): Y. Du, S. Li, A. Torralba, J. B. Tenenbaum,
+  I. Mordatch. *Improving Factuality and Reasoning in Language Models through Multiagent
+  Debate.* ICML 2024. Solvers see each other's answers for several rounds before an aggregator
+  decides.
+- **Retrieval-augmented generation** (`RAGTool`, `RAGAgent`): P. Lewis et al.
+  *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.* NeurIPS 2020. Here the
+  retriever is a LangChain vector store and the retrieved passages are handed to the agent's LLM.
 
-- **Session** — `InMemorySession`, `SQLiteSession` for multi-turn context
-- **Runner** — `Runner.run()`, `Runner.arun()` with `RunConfig`, `RunHooks`, retries
-- **TraceHooks** — Observability: run/LLM/tool events, token usage, cost estimation
-- **Human-in-loop** — `interrupt_before_tools=["pay", "send_email"]` to pause for approval
+## When to use it
 
----
+AgentEnsemble fits when you want readable agent code with a small API, OpenAI or Mistral, and
+built-in sessions, tracing and approvals, without adopting a large framework. If you need
+durable, checkpointed graph execution across processes, a very large integration catalogue, or
+a provider other than OpenAI-compatible endpoints and Mistral out of the box, a larger framework
+such as LangGraph may suit you better; AgentEnsemble agents can still be called from it, since
+they are plain Python objects.
 
-## Project Structure
+## Roadmap
 
-```
-agentensemble/
-├── agents/         # ReAct, StateGraph, RAG, Hybrid, Structured
-├── core/           # AgentProtocol, RunnableProtocol
-├── llm/            # LLMProvider, OpenAILLMProvider, MistralLLMProvider, get_default_provider
-├── memory/         # Session, InMemorySession, SQLiteSession
-├── orchestration/  # Ensemble, Supervisor, Swarm, Pipeline, Debate
-├── tools/          # Tool protocol, @function_tool, built-ins
-├── router/         # RouterAgent (LLM-based routing)
-├── planner/        # PlannerAgent (task decomposition)
-├── graph/          # WorkflowGraph (composable workflows)
-├── tracing/        # TraceHooks, TraceEvent
-├── testing/        # Benchmark, AgentComparison, Metrics
-└── runner.py       # Runner, RunConfig, RunHooks
-```
+- LLM-based planning in `PlannerAgent` (today it is rule-based; `_decompose` can be overridden).
+- Optional multi-round tool use per turn in `ReActAgent`.
+- Token-level streaming in `astream()` (today it streams step events).
+- Async-native `SQLiteSession` and a Redis session.
+- Anthropic and other providers through the same `LLMProvider` interface.
 
----
+## Contributing, security, citation, license
 
-## Comparison
-
-| Feature            | AgentEnsemble             | LangGraph    | CrewAI | AutoGen |
-| ------------------ | ------------------------- | ------------ | ------ | ------- |
-| Multi-provider LLM | OpenAI, Mistral (extensible) | Any          | Any    | Any     |
-| Async API          | `arun()` everywhere       | Yes          | Yes    | Yes     |
-| Router agents      | RouterAgent               | Manual       | Yes    | Manual  |
-| Planner pattern    | PlannerAgent              | Manual       | Yes    | Manual  |
-| Graph workflows    | WorkflowGraph, StateGraph | Native       | No     | No      |
-| Debate pattern     | DebateOrchestrator        | Manual       | Yes    | Yes     |
-| Session memory     | InMemory, SQLite          | Checkpointer | No     | No      |
-| Observability      | TraceHooks, usage, cost   | LangSmith    | No     | No      |
-| Human-in-loop     | interrupt_before_tools    | interrupt()  | No     | No      |
-
----
-
-## Production Use
-
-- **Retries**: `RunConfig(max_retries=2, retry_on=(RateLimitError, TimeoutError))`
-- **Session**: `Runner.run(agent, query, config=RunConfig(session=SQLiteSession()))`
-- **Tracing**: `RunConfig(trace_hooks=TraceHooks())` — captures run/LLM/tool events, usage, cost
-- **Human-in-loop**: `RunConfig(interrupt_before_tools=["pay"])` — pause before sensitive tools; resume with `Runner.run(agent, ..., resume=run_state, resume_value="Approved")`
-- **Benchmarks**: `AgentComparison`, `Benchmark.research_tasks()`, `Metrics`
-
----
-
-## Documentation
-
-- **[Showcase](examples/showcase_all.py)** — Run the features end to end with real API calls
-- [Changelog](CHANGELOG.md)
-- [Examples](examples/) — `quickstart`, `react_llm`, `swarm`, `pipeline`, `streaming`, `debate`, `rag`, `research_agent`, `graph_workflow`, `runner`, `structured_output`
-- [Roadmap](docs/ROADMAP_2025.md) — Planned improvements
-
----
-
-## Contributing
-
-Contributions are welcome. See [CONTRIBUTING.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/CONTRIBUTING.md)
-and the [Code of Conduct](https://github.com/irfanalidv/AgentEnsemble/blob/main/CODE_OF_CONDUCT.md).
-
-```bash
-git clone https://github.com/irfanalidv/AgentEnsemble.git && cd AgentEnsemble
-pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest
-```
-
-Security issues: please follow [SECURITY.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/SECURITY.md).
-
-## License
-
-MIT — see [LICENSE](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE).
+- Contributions are welcome: see [CONTRIBUTING.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/CONTRIBUTING.md)
+  and the [Code of Conduct](https://github.com/irfanalidv/AgentEnsemble/blob/main/CODE_OF_CONDUCT.md).
+  CI runs `ruff check`, `ruff format --check`, `mypy agentensemble` and `pytest --cov` on
+  Python 3.10 to 3.13.
+- Report vulnerabilities as described in [SECURITY.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/SECURITY.md).
+- If you use AgentEnsemble in research, please cite it with
+  [CITATION.cff](https://github.com/irfanalidv/AgentEnsemble/blob/main/CITATION.cff) (GitHub's
+  "Cite this repository" button reads it).
+- Changes are listed in the [CHANGELOG](https://github.com/irfanalidv/AgentEnsemble/blob/main/CHANGELOG.md).
+- MIT licensed: see [LICENSE](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE).
