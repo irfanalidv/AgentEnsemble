@@ -12,19 +12,62 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-# List prices in USD per 1M tokens (input, output). Prices change; pass
-# estimate_cost(pricing=...) for exact numbers.
+# Standard list prices in USD per 1M tokens (input, output), checked against the providers'
+# official pricing pages on PRICING_AS_OF:
+#   OpenAI     https://developers.openai.com/api/docs/pricing
+#   Anthropic  https://platform.claude.com/docs/en/about-claude/pricing
+#   Mistral    https://docs.mistral.ai/inference/pricing
+# Long-context tiers are listed at their short-context price. Prices change; pass
+# estimate_cost(pricing=...) for exact numbers. Names match exactly, then by longest prefix.
+PRICING_AS_OF = "2026-10-31"
+
 DEFAULT_PRICING: dict[str, tuple[float, float]] = {
+    # OpenAI
+    "gpt-6-astra": (10.0, 50.0),
+    "gpt-6.1-sol": (2.0, 10.0),
+    "gpt-6.1-terra": (1.0, 5.0),
+    "gpt-6-sol": (2.0, 10.0),
+    "gpt-6-luna": (0.10, 0.50),
+    "gpt-5.6-sol": (4.0, 20.0),
+    "gpt-5.6-terra": (2.0, 12.0),
+    "gpt-5.6-luna": (0.20, 1.20),
+    "gpt-5.5": (5.0, 30.0),
+    "gpt-5.4": (2.50, 15.0),
+    "gpt-5.4-mini": (0.75, 4.50),
+    "gpt-5.4-nano": (0.20, 1.25),
+    "gpt-5.2": (1.75, 14.0),
+    "gpt-5.1": (1.25, 10.0),
+    "gpt-5": (1.25, 10.0),
+    "gpt-5-mini": (0.25, 2.0),
+    "gpt-5-nano": (0.05, 0.40),
     "gpt-4.1": (2.0, 8.0),
-    "gpt-4.1-mini": (0.4, 1.6),
-    "gpt-4.1-nano": (0.1, 0.4),
-    "mistral-large-latest": (2.0, 6.0),
-    "mistral-small-latest": (0.35, 0.56),
-    "mistral-large": (2.0, 6.0),
-    "mistral-small": (0.35, 0.56),
-    "gpt-4o": (2.5, 10.0),
-    "gpt-4o-mini": (0.15, 0.6),
-    "claude-3-5-sonnet": (3.0, 15.0),
+    "gpt-4.1-mini": (0.40, 1.60),
+    "gpt-4.1-nano": (0.10, 0.40),
+    "gpt-4o": (2.50, 10.0),
+    "gpt-4o-mini": (0.15, 0.60),
+    "o3": (2.0, 8.0),
+    "o3-mini": (1.10, 4.40),
+    "o4-mini": (1.10, 4.40),
+    # Anthropic
+    "claude-fable-5": (10.0, 50.0),
+    "claude-opus-5-5": (4.0, 20.0),
+    "claude-opus-5": (5.0, 25.0),
+    "claude-opus-4-5": (5.0, 25.0),
+    "claude-opus-4-6": (5.0, 25.0),
+    "claude-opus-4-7": (5.0, 25.0),
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-sonnet-5": (2.0, 10.0),
+    "claude-sonnet-4": (3.0, 15.0),
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-3-5-sonnet": (3.0, 15.0),  # retired; last list price
+    # Mistral: family prefixes also cover -latest aliases and dated ids
+    "mistral-large": (0.70, 2.10),
+    "mistral-small": (0.15, 0.60),
+    "ministral-14b": (0.20, 0.20),
+    "ministral-8b": (0.15, 0.15),
+    "ministral-3b": (0.10, 0.10),
+    "codestral": (0.30, 0.90),
 }
 
 
@@ -52,14 +95,14 @@ def estimate_cost(
         pricing: Optional override {(model, (input_per_1M, output_per_1M))}
 
     Returns:
-        Estimated cost in USD. Unknown models are priced as ``mistral-large-latest``.
+        Estimated cost in USD. Unknown models are priced as ``mistral-large``.
     """
     if not usage:
         return 0.0
     prices = (
         _lookup_price(model, pricing or DEFAULT_PRICING)
         or _lookup_price(model, DEFAULT_PRICING)
-        or DEFAULT_PRICING["mistral-large-latest"]
+        or DEFAULT_PRICING["mistral-large"]
     )
     inp = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
     out = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)

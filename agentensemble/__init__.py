@@ -9,7 +9,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("agentensemble")
 except PackageNotFoundError:  # running from a source checkout without installation
-    __version__ = "0.6.0"
+    __version__ = "0.6.1"
 __author__ = "Irfan Ali"
 
 # Core imports

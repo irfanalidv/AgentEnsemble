@@ -1,5 +1,7 @@
 """Tests for tracing and observability."""
 
+import pytest
+
 from agentensemble.tracing import TraceEvent, TraceEventType, TraceHooks, estimate_cost
 
 
@@ -13,8 +15,8 @@ class TestEstimateCost:
         usage = {"input_tokens": 1000, "output_tokens": 500}
         cost = estimate_cost(usage, model="mistral-large-latest")
         assert cost > 0
-        # 1000 * 2/1e6 + 500 * 6/1e6 = 0.002 + 0.003 = 0.005
-        assert 0.004 < cost < 0.006
+        # 1000 * 0.70/1e6 + 500 * 2.10/1e6 = 0.0007 + 0.00105 = 0.00175
+        assert cost == pytest.approx(0.00175)
 
     def test_prompt_completion_aliases(self):
         usage = {"prompt_tokens": 100, "completion_tokens": 50}

@@ -5,7 +5,7 @@ abstract: "Build, orchestrate, trace, and test multi-agent LLM systems in Python
 authors:
   - family-names: Ali
     given-names: Irfan
-version: "0.6.0"
+version: "0.6.1"
 date-released: "2026-10-31"
 license: MIT
 repository-code: "https://github.com/irfanalidv/AgentEnsemble"

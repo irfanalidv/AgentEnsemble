@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-31
+
+### Fixed
+- `estimate_cost` priced Mistral at outdated rates: Large at $2/$6 per 1M tokens (now
+  $0.70/$2.10) and Small at $0.35/$0.56 (now $0.15/$0.60). The table is now checked against
+  the official OpenAI, Anthropic and Mistral pricing pages, dated by `PRICING_AS_OF`, and adds
+  current GPT-6/5.x/5, o3/o4-mini, Claude 4.5+/5.x and Ministral/Codestral entries.
+
 ## [0.6.0] - 2026-10-31
 
 ### Fixed

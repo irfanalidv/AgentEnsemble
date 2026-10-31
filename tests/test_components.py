@@ -418,7 +418,10 @@ def test_estimate_cost_prefix_match_and_fallback():
     usage = {"input_tokens": 1_000_000, "output_tokens": 1_000_000}
     assert estimate_cost(usage, model="gpt-4.1-mini-2025-04-14") == pytest.approx(2.0)
     assert estimate_cost(usage, model="gpt-4.1") == pytest.approx(10.0)
-    assert estimate_cost(usage, model="unknown-model") == pytest.approx(8.0)  # mistral-large
+    assert estimate_cost(usage, model="unknown-model") == pytest.approx(2.80)  # mistral-large
+    assert estimate_cost(usage, model="mistral-small-latest") == pytest.approx(0.75)
+    assert estimate_cost(usage, model="gpt-5-mini") == pytest.approx(2.25)
+    assert estimate_cost(usage, model="claude-sonnet-4-5-20250929") == pytest.approx(18.0)
     assert estimate_cost(usage, model="m", pricing={"m": (1.0, 1.0)}) == pytest.approx(2.0)
 
 
