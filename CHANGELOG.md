@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-31
+
+### Fixed
+- `ReActAgent` session memory: the user's question and the final answer were never saved, so
+  follow-up turns lost context. A turn now stores the question, tool exchanges and answer.
+- `ReActAgent` disabled tools on every turn after the first turn that used one (tool messages
+  in the history counted as "already called"). Only the current turn is checked now.
+- Session history windows could start with an orphan `tool` message, which chat APIs reject.
+- `RunConfig(session=...)` had no effect on `ReActAgent`.
+- `SQLiteSession` leaked one open connection per call (`with sqlite3.connect()` does not close).
+- `WorkflowGraph`: a node without a matching outgoing edge re-ran until the 50-step limit
+  instead of ending the run. `WorkflowGraph` and `StateGraphAgent` reported every node as
+  visited; `nodes_visited` now lists the nodes that ran.
+- `ScraperTool(provider="simple")` returned placeholder text instead of fetching the page.
+- `RAGAgent` always reported `fallback_attempts=0` and re-fetched URLs on every fallback.
+- `RAGTool` and `SearchTool` had no tool description, so models saw "Tool: rag" and often
+  skipped them. URL loading in `RAGTool` had no timeout and failures were printed.
+- `HybridAgent` blocked the event loop while running sync tools.
+- `import agentensemble` logged a langchain-community USER_AGENT warning.
+- LangChain tool calls were built with `type="function"` instead of `"tool_call"`.
+
+### Added
+- `ScraperTool` fetches with httpx (timeout, redirects, `max_chars`, http(s) only) and converts
+  HTML to text; `ScraperTool.fetch()` raises `ScraperError`. New `html_to_text()` helper.
+- `RAGTool.index_texts()` indexes local text without network; `RAGTool(description=...,
+  fetch_timeout=...)`.
+- `get_default_embeddings()` / `get_openai_embeddings()`: `RAGTool` embeddings follow the same
+  OpenAI-first provider selection as chat models.
+- `WorkflowGraph(max_steps=...)` and a `steps` count in its metadata.
+- `estimate_cost` knows the `gpt-4.1` family and matches dated model names by prefix.
+- Four offline-runnable examples (customer-support RAG, ticket triage, order assistant with
+  approval, CSV analytics) and a rule-based `LLMProvider` for running examples without a key.
+- CodeQL workflow, pre-commit config, mypy and coverage gate (85%) in CI; `httpx` is now a
+  declared dependency.
+
+### Changed
+- Library code logs through `logging` instead of printing.
+- Ruff rules broadened (SIM, C4, RUF, PTH, RET, PIE); mypy runs with `check_untyped_defs`.
+- README rewritten: architecture diagrams, configuration and API tables, references.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added
