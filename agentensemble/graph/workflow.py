@@ -37,11 +37,22 @@ class WorkflowGraph:
         edges: list[Edge] | None = None,
         entry: str = "start",
         exit_nodes: list[str] | None = None,
+        max_steps: int = 50,
     ):
+        """
+        Args:
+            nodes: Node name -> callable ``(state) -> dict`` (merged into state) or the name of
+                the next node.
+            edges: Edges evaluated in order after a node runs; the first matching edge wins.
+            entry: Name of the first node.
+            exit_nodes: Node names that stop execution (default ``["end"]``).
+            max_steps: Safety limit on node executions, so cyclic graphs always terminate.
+        """
         self.nodes = nodes or {}
         self.edges = edges or []
         self.entry = entry
         self.exit_nodes = set(exit_nodes or ["end"])
+        self.max_steps = max_steps
 
     def add_node(self, name: str, node: Node) -> "WorkflowGraph":
         """Add a node. Chainable."""
@@ -49,7 +60,10 @@ class WorkflowGraph:
         return self
 
     def add_edge(
-        self, source: str, target: str, condition: Callable | None = None
+        self,
+        source: str,
+        target: str,
+        condition: Callable[[dict[str, Any]], bool] | None = None,
     ) -> "WorkflowGraph":
         """Add an edge. Chainable."""
         self.edges.append(Edge(source, target, condition))
@@ -64,7 +78,8 @@ class WorkflowGraph:
             "current_node": self.entry,
         }
 
-        for _ in range(50):  # Max steps
+        visited: list[str] = []
+        for _ in range(self.max_steps):
             current = state["current_node"]
             if current in self.exit_nodes:
                 break
@@ -73,12 +88,10 @@ class WorkflowGraph:
             if not node:
                 break
 
-            if callable(node):
-                out = node(state)
-            else:
-                out = {"current_node": node}
+            visited.append(current)
+            out = node(state) if callable(node) else {"current_node": node}
 
-            state.update(out)
+            state.update(out or {})
             next_node = state.get("current_node")
 
             # Resolve next via edges
@@ -90,5 +103,5 @@ class WorkflowGraph:
 
         return {
             "result": state.get("result", "No result"),
-            "metadata": {"nodes_visited": list(self.nodes.keys()), "state": state},
+            "metadata": {"nodes_visited": visited, "steps": len(visited), "state": state},
         }

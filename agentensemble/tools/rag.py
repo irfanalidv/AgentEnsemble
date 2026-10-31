@@ -9,6 +9,7 @@ Supports:
 - RAG Chain: Two-step chain with single LLM call
 """
 
+import logging
 from typing import Any
 
 from dotenv import load_dotenv
@@ -28,13 +29,18 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    WebBaseLoader = None
-    Chroma = None
-    InMemoryVectorStore = None
-    MistralAIEmbeddings = None
-    Document = None
-    RecursiveCharacterTextSplitter = None
-    tool = None
+    WebBaseLoader = None  # type: ignore[assignment,misc]
+    Chroma = None  # type: ignore[assignment,misc]
+    InMemoryVectorStore = None  # type: ignore[assignment,misc]
+    MistralAIEmbeddings = None  # type: ignore[assignment,misc]
+    Document = None  # type: ignore[assignment,misc]
+    RecursiveCharacterTextSplitter = None  # type: ignore[assignment,misc]
+    tool = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
+
+#: Default per-request timeout (seconds) for fetching URLs in ``index_documents``.
+DEFAULT_FETCH_TIMEOUT = 30.0
 
 
 class RAGTool:
@@ -55,7 +61,8 @@ class RAGTool:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         fallback_strategies: int = 3,
-        **kwargs,
+        fetch_timeout: float = DEFAULT_FETCH_TIMEOUT,
+        **kwargs: Any,
     ):
         """
         Initialize RAG tool.
@@ -66,6 +73,7 @@ class RAGTool:
             chunk_size: Size of text chunks for splitting
             chunk_overlap: Overlap between chunks
             fallback_strategies: Number of fallback query variations
+            fetch_timeout: Per-request timeout in seconds when loading URLs
             **kwargs: Additional configuration
         """
         self.name = "rag"
@@ -74,6 +82,7 @@ class RAGTool:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.fallback_strategies = fallback_strategies
+        self.fetch_timeout = fetch_timeout
         self.config = kwargs
         self._text_splitter: Any | None = None
 
@@ -87,21 +96,20 @@ class RAGTool:
             )
 
         # Initialize text splitter (as per LangChain RAG tutorial)
-        if not self._text_splitter and RecursiveCharacterTextSplitter:
+        if not self._text_splitter and RecursiveCharacterTextSplitter is not None:
             self._text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap
             )
 
-        # Initialize embeddings if not provided (using Mistral)
-        if not self.embeddings and MistralAIEmbeddings:
-            from agentensemble.utils.llm import get_mistral_embeddings
+        # Initialize embeddings if not provided (OpenAI or Mistral, picked from the environment)
+        if not self.embeddings:
+            from agentensemble.utils.llm import get_default_embeddings
 
-            self.embeddings = get_mistral_embeddings()
+            self.embeddings = get_default_embeddings()
 
         # Initialize vector store if not provided
-        if not self.vector_store:
-            if InMemoryVectorStore and self.embeddings:
-                self.vector_store = InMemoryVectorStore(self.embeddings)
+        if not self.vector_store and InMemoryVectorStore is not None and self.embeddings:
+            self.vector_store = InMemoryVectorStore(self.embeddings)
 
     def index_documents(self, urls: list[str]) -> None:
         """
@@ -115,7 +123,7 @@ class RAGTool:
         Args:
             urls: List of URLs to load and index
         """
-        if not LANGCHAIN_AVAILABLE or not WebBaseLoader:
+        if not LANGCHAIN_AVAILABLE or WebBaseLoader is None:
             raise ImportError("langchain-community required for indexing")
 
         self._initialize_components()
@@ -124,14 +132,48 @@ class RAGTool:
         documents = []
         for url in urls:
             try:
-                loader = WebBaseLoader(web_paths=(url,))
-                docs = loader.load()
-                documents.extend(docs)
-            except Exception as e:
-                print(f"Warning: Failed to load {url}: {e}")
+                loader = WebBaseLoader(
+                    web_paths=(url,),
+                    requests_kwargs={"timeout": self.fetch_timeout},
+                    raise_for_status=True,
+                )
+                documents.extend(loader.load())
+            except Exception as e:  # one bad URL should not abort the whole batch
+                logger.warning("Failed to load %s: %s", url, e)
 
+        self._add_documents(documents)
+
+    def index_texts(
+        self,
+        texts: list[str],
+        metadatas: list[dict[str, Any]] | None = None,
+    ) -> int:
+        """
+        Index raw text (FAQ entries, local files, database rows) without any network fetch.
+
+        Args:
+            texts: Text passages to index
+            metadatas: Optional metadata per passage (e.g. ``{"source": "faq.md"}``)
+
+        Returns:
+            Number of chunks added to the vector store
+        """
+        if not LANGCHAIN_AVAILABLE or Document is None:
+            raise ImportError(
+                "langchain-core and langchain-text-splitters are required for indexing. "
+                "Install with: pip install 'agentensemble[rag]'"
+            )
+        if metadatas is not None and len(metadatas) != len(texts):
+            raise ValueError("metadatas must have the same length as texts")
+        self._initialize_components()
+        metas = metadatas or [{} for _ in texts]
+        docs = [Document(page_content=t, metadata=m) for t, m in zip(texts, metas, strict=True)]
+        return self._add_documents(docs)
+
+    def _add_documents(self, documents: list[Any]) -> int:
+        """Split documents and add them to the vector store. Returns the chunk count."""
         if not documents:
-            return
+            return 0
 
         # Split documents (as per LangChain tutorial)
         if self._text_splitter:
@@ -140,8 +182,13 @@ class RAGTool:
             all_splits = documents
 
         # Store in vector store (as per LangChain tutorial)
-        if self.vector_store:
-            self.vector_store.add_documents(documents=all_splits)
+        if self.vector_store is None:
+            raise RuntimeError(
+                "RAGTool has no vector store: pass vector_store= or embeddings=, "
+                "or set OPENAI_API_KEY / MISTRAL_API_KEY for default embeddings."
+            )
+        self.vector_store.add_documents(documents=all_splits)
+        return len(all_splits)
 
     def create_retrieval_tool(self):
         """
@@ -152,17 +199,19 @@ class RAGTool:
         Returns:
             LangChain tool instance
         """
-        if not LANGCHAIN_AVAILABLE or not tool:
+        if not LANGCHAIN_AVAILABLE or tool is None:
             raise ImportError("langchain required for tool creation")
 
         if not self.vector_store:
             raise ValueError("Vector store must be initialized. Call index_documents() first.")
 
+        vector_store = self.vector_store
+
         # Create retrieval tool following LangChain RAG tutorial pattern
         @tool(response_format="content_and_artifact")
         def retrieve_context(query: str):
             """Retrieve information to help answer a query."""
-            retrieved_docs = self.vector_store.similarity_search(query, k=2)
+            retrieved_docs = vector_store.similarity_search(query, k=2)
             serialized = "\n\n".join(
                 (f"Source: {doc.metadata}\nContent: {doc.page_content}") for doc in retrieved_docs
             )
@@ -215,7 +264,7 @@ class RAGTool:
 
         # Retrieve context
         if self.vector_store:
-            context, docs = self.retrieve(question, k=3)
+            context, _docs = self.retrieve(question, k=3)
             return context
 
         return f"RAG answer to '{question}' [index documents first with index_documents()]"

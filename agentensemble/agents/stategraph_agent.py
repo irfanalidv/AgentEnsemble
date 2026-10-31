@@ -52,6 +52,7 @@ class StateGraphAgent(BaseAgent):
 
         # Simplified StateGraph execution
         current_node = "start"
+        visited: list[str] = []
 
         for _iteration in range(self.max_iterations):
             if not self._validate_state(state):
@@ -59,7 +60,8 @@ class StateGraphAgent(BaseAgent):
 
             # Execute current node
             if current_node in self.nodes:
-                node_result = self.nodes[current_node](state)
+                visited.append(current_node)
+                node_result = self.nodes[current_node](state) or {}
                 state = self._update_state(state, **node_result)
 
                 # Route to next node
@@ -73,7 +75,7 @@ class StateGraphAgent(BaseAgent):
             "result": state.result or "No result generated",
             "metadata": {
                 "iterations": state.iteration_count,
-                "nodes_visited": list(self.nodes.keys()),
+                "nodes_visited": visited,
                 "agent": self.name,
             },
         }

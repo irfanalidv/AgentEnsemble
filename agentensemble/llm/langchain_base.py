@@ -61,7 +61,7 @@ def _messages_to_langchain(messages: list[LLMMessage]) -> list[BaseMessage]:
                     lc_tool_calls.append(
                         LCToolCall(
                             id=tc.id or f"call_{tc.name}",
-                            type="function",
+                            type="tool_call",
                             name=tc.name,
                             args=tc.arguments,
                         )

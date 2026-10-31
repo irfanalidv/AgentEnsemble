@@ -53,14 +53,17 @@ class RAGAgent(BaseAgent):
 
         # Try primary query
         result = self._query_rag(state.query, urls)
+        fallback_attempts = 0
 
         if result and result != "not found":
             state.result = result
         else:
             # Try fallback strategies
             for i in range(self.fallback_strategies):
+                fallback_attempts += 1
                 fallback_query = self._generate_fallback_query(state.query, i)
-                result = self._query_rag(fallback_query, urls)
+                # URLs were already indexed by the primary query; don't fetch them again.
+                result = self._query_rag(fallback_query, None)
                 if result and result != "not found":
                     state.result = result
                     break
@@ -68,7 +71,7 @@ class RAGAgent(BaseAgent):
         return {
             "result": state.result or "No result found",
             "metadata": {
-                "fallback_attempts": min(self.fallback_strategies, state.iteration_count),
+                "fallback_attempts": fallback_attempts,
                 "agent": self.name,
             },
         }

@@ -5,6 +5,7 @@ Adapt existing tools (SearchTool, RAGTool, etc.) to the Tool protocol
 for use with LLM function calling.
 """
 
+import asyncio
 from typing import Any
 
 from agentensemble.llm.interface import ToolSchema
@@ -28,8 +29,8 @@ def adapt_to_tool_schema(
     Returns:
         ToolSchema for LLM function calling
     """
-    tool_name = name or getattr(tool, "name", "unknown")
-    tool_desc = description or getattr(tool, "description", f"Tool: {tool_name}")
+    tool_name = str(name or getattr(tool, "name", None) or "unknown")
+    tool_desc = str(description or getattr(tool, "description", None) or f"Tool: {tool_name}")
 
     # Default schema for common tools
     if param_schema is None:
@@ -40,6 +41,18 @@ def adapt_to_tool_schema(
                     "query": {"type": "string", "description": "Search query"},
                 },
                 "required": ["query"],
+            }
+        elif tool_name == "scraper":
+            param_schema = {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "http(s) URL to fetch"},
+                    "question": {
+                        "type": "string",
+                        "description": "Optional question to answer from the page",
+                    },
+                },
+                "required": ["url"],
             }
         elif tool_name == "rag":
             param_schema = {
@@ -70,7 +83,7 @@ def adapt_to_tool_schema(
     )
 
 
-def get_tool_schemas(tools: list) -> list:
+def get_tool_schemas(tools: list[Any]) -> list[ToolSchema]:
     """
     Convert a list of tools to ToolSchema list.
 
@@ -78,7 +91,7 @@ def get_tool_schemas(tools: list) -> list:
     - FunctionTool / protocol-compliant tools
     - Legacy tools (SearchTool, RAGTool) via adapt_to_tool_schema
     """
-    schemas = []
+    schemas: list[ToolSchema] = []
     for t in tools:
         if hasattr(t, "get_schema"):
             schemas.append(t.get_schema())
@@ -92,6 +105,8 @@ def _normalize_arguments(tool: Any, tool_name: str, arguments: dict[str, Any]) -
     args = dict(arguments)
     if tool_name == "rag" and "query" in args and "question" not in args:
         args["question"] = args.pop("query")
+    if tool_name == "scraper" and "query" in args and "url" not in args:
+        args["url"] = args.pop("query")
     return args
 
 
@@ -113,7 +128,5 @@ async def ainvoke_tool(tool: Any, name: str, arguments: dict[str, Any]) -> Any:
     if hasattr(tool, "arun"):
         return await tool.arun(**args)
     if hasattr(tool, "run"):
-        import asyncio
-
         return await asyncio.to_thread(tool.run, **args)
     return str(arguments)

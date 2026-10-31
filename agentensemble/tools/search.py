@@ -5,6 +5,7 @@ Web search functionality for agents using LangChain community tools.
 Defaults to Serper API if API key is available, otherwise falls back to DuckDuckGo.
 """
 
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -26,18 +27,20 @@ try:
         SERPER_AVAILABLE = True
     except ImportError:
         SERPER_AVAILABLE = False
-        GoogleSerperAPIWrapper = None
-        Tool = None
+        GoogleSerperAPIWrapper = None  # type: ignore[assignment,misc]
+        Tool = None  # type: ignore[assignment,misc]
     from langchain_core.tools import BaseTool
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    BaseTool = object
+    BaseTool = object  # type: ignore[assignment,misc]
     SERPER_AVAILABLE = False
-    GoogleSerperAPIWrapper = None
-    Tool = None
+    GoogleSerperAPIWrapper = None  # type: ignore[assignment,misc]
+    Tool = None  # type: ignore[assignment,misc]
 
+
+logger = logging.getLogger(__name__)
 
 _PROVIDERS = ("serper", "duckduckgo", "duckduckgo_results")
 
@@ -73,10 +76,7 @@ class SearchTool:
         # Auto-detect provider if not specified
         if provider is None:
             serper_key = api_key or os.getenv("SERPER_API_KEY")
-            if serper_key and SERPER_AVAILABLE:
-                provider = "serper"
-            else:
-                provider = "duckduckgo"
+            provider = "serper" if serper_key and SERPER_AVAILABLE else "duckduckgo"
 
         if provider not in _PROVIDERS:
             raise ValueError(f"Unknown provider: {provider!r}. Supported: {', '.join(_PROVIDERS)}")
@@ -105,16 +105,16 @@ class SearchTool:
             )
 
         if self.provider == "serper":
-            if not SERPER_AVAILABLE or not GoogleSerperAPIWrapper:
+            if not SERPER_AVAILABLE or GoogleSerperAPIWrapper is None:
                 # Fallback to DuckDuckGo if Serper not available
-                print("Warning: Serper API not available, falling back to DuckDuckGo")
+                logger.warning("Serper API wrapper not available, falling back to DuckDuckGo")
                 self.provider = "duckduckgo"
                 self._tool = DuckDuckGoSearchRun()
                 return
 
             if not self.api_key:
                 # Fallback to DuckDuckGo if no API key
-                print("Warning: SERPER_API_KEY not found, falling back to DuckDuckGo")
+                logger.warning("SERPER_API_KEY not set, falling back to DuckDuckGo")
                 self.provider = "duckduckgo"
                 self._tool = DuckDuckGoSearchRun()
                 return
@@ -130,8 +130,7 @@ class SearchTool:
             self._tool = DuckDuckGoSearchResults()
         else:
             raise ValueError(
-                f"Unknown provider: {self.provider}. "
-                "Supported: 'serper' (default if API key available), 'duckduckgo' (free, fallback), 'duckduckgo_results' (free)"
+                f"Unknown provider: {self.provider!r}. Supported: {', '.join(_PROVIDERS)}"
             )
 
     def run(self, query: str, **kwargs) -> str:
@@ -167,4 +166,5 @@ class SearchTool:
         """
         if not self._tool:
             self._initialize_tool()
+        assert self._tool is not None  # _initialize_tool sets it or raises
         return self._tool

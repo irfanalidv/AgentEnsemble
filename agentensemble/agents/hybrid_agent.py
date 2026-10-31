@@ -15,7 +15,11 @@ from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolSchema
 # Routing tool: LLM chooses next action via function calling
 ROUTE_ACTION_SCHEMA = ToolSchema(
     name="choose_next_action",
-    description="Choose the next step in the hybrid workflow. SEARCH: search the web for current info. RAG: retrieve from documents/context. VALIDATE: validate the current answer quality. ANSWER: return the final answer to the user.",
+    description=(
+        "Choose the next step in the hybrid workflow. SEARCH: search the web for current info. "
+        "RAG: retrieve from documents/context. VALIDATE: validate the current answer quality. "
+        "ANSWER: return the final answer to the user."
+    ),
     parameters={
         "type": "object",
         "properties": {
@@ -114,15 +118,15 @@ class HybridAgent(BaseAgent):
                 if self.early_stopping:
                     break
             elif action == "SEARCH":
-                result = self._search(state)
+                result = await asyncio.to_thread(self._search, state)
                 state.context["search_results"] = result
                 actions_taken.append(action)
             elif action == "RAG":
-                result = self._rag(state)
+                result = await asyncio.to_thread(self._rag, state)
                 state.context["rag_results"] = result
                 actions_taken.append(action)
             elif action == "VALIDATE":
-                validation = self._validate(state)
+                validation = await asyncio.to_thread(self._validate, state)
                 state.context["validation"] = validation
                 actions_taken.append(action)
             else:
@@ -194,11 +198,18 @@ class HybridAgent(BaseAgent):
 
     async def _decide_action_llm(self, state: AgentState) -> str:
         """Use LLM to choose next action via function calling."""
+        if self.llm is None:
+            return self._decide_action_fixed(state)
         prompt = self._build_routing_prompt(state)
         messages: list[LLMMessage] = [
             LLMMessage(
                 role="system",
-                content="You are a routing agent. Choose the next step: SEARCH (get web info), RAG (retrieve from docs), VALIDATE (check answer quality), or ANSWER (return final answer). Pick the most useful next step given what has already been done.",
+                content=(
+                    "You are a routing agent. Choose the next step: SEARCH (get web info), "
+                    "RAG (retrieve from docs), VALIDATE (check answer quality), or ANSWER "
+                    "(return final answer). Pick the most useful next step given what has "
+                    "already been done."
+                ),
             ),
             LLMMessage(role="user", content=prompt),
         ]
@@ -231,10 +242,7 @@ class HybridAgent(BaseAgent):
         if rag_tool:
             # Handle search_results as either string or dict
             search_results = state.context.get("search_results", "")
-            if isinstance(search_results, dict):
-                urls = search_results.get("urls", [])
-            else:
-                urls = []  # No URLs from search
+            urls = search_results.get("urls", []) if isinstance(search_results, dict) else []
             return rag_tool.run(state.query, urls=urls)
         return "RAG tool not available"
 
