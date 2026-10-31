@@ -91,8 +91,12 @@ class WorkflowGraph:
             visited.append(current)
             out = node(state) if callable(node) else {"current_node": node}
 
-            state.update(out or {})
-            next_node = state.get("current_node")
+            out = out or {}
+            state.update(out)
+            # A node may jump explicitly by returning "current_node"; otherwise the next node
+            # comes from the edges, and a node with no matching edge ends the run. (Reading the
+            # stale state["current_node"] here made edge-less nodes re-run until max_steps.)
+            next_node = out.get("current_node")
 
             # Resolve next via edges
             for edge in self.edges:

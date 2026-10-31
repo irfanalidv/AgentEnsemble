@@ -430,3 +430,15 @@ def test_builtin_tools_describe_themselves_to_the_llm():
 
     (search_schema,) = get_tool_schemas([SearchTool(provider="duckduckgo")])
     assert search_schema.description.startswith("Search the web")
+
+
+def test_workflow_node_without_outgoing_edge_ends_the_run():
+    graph = (
+        WorkflowGraph(entry="classify")
+        .add_node("classify", lambda s: {"context": {"refund": True}})
+        .add_node("refund", lambda s: {"result": "refunds team"})
+        .add_edge("classify", "refund", lambda s: s["context"]["refund"])
+    )
+    out = graph.run("refund please")
+    assert out["result"] == "refunds team"
+    assert out["metadata"]["nodes_visited"] == ["classify", "refund"]
