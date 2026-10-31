@@ -7,7 +7,7 @@ Persistent session storage using SQLite. No external dependencies beyond stdlib.
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class SQLiteSession:
@@ -20,7 +20,7 @@ class SQLiteSession:
     def __init__(
         self,
         session_id: str = "default",
-        db_path: Optional[str] = None,
+        db_path: str | None = None,
     ):
         """
         Initialize SQLite session.
@@ -50,7 +50,7 @@ class SQLiteSession:
                 """
             )
 
-    def get_messages(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_messages(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Retrieve conversation history. Latest N if limit set."""
         with sqlite3.connect(self._db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -62,7 +62,7 @@ class SQLiteSession:
             rows = cur.fetchall()
         out = []
         for r in rows:
-            d: Dict[str, Any] = {"role": r["role"], "content": r["content"] or ""}
+            d: dict[str, Any] = {"role": r["role"], "content": r["content"] or ""}
             if r["tool_call_id"]:
                 d["tool_call_id"] = r["tool_call_id"]
             if r["tool_calls"]:
@@ -72,7 +72,7 @@ class SQLiteSession:
             return out[-limit:]
         return out
 
-    def add_messages(self, messages: List[Dict[str, Any]]) -> None:
+    def add_messages(self, messages: list[dict[str, Any]]) -> None:
         """Append messages to history."""
         with sqlite3.connect(self._db_path) as conn:
             cur = conn.execute(

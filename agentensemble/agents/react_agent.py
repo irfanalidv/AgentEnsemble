@@ -11,14 +11,16 @@ Research basis:
 
 import asyncio
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
-from agentensemble.agents.base import BaseAgent, AgentState
+from agentensemble.agents.base import AgentState, BaseAgent
 from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolCall
-from agentensemble.tools.adapters import get_tool_schemas, ainvoke_tool
+from agentensemble.tools.adapters import ainvoke_tool, get_tool_schemas
 
 try:
-    from agentensemble.tracing import TraceEventType, TraceEvent, estimate_cost
+    from agentensemble.tracing import TraceEvent, TraceEventType, estimate_cost
+
     TRACING_AVAILABLE = True
 except ImportError:
     TRACING_AVAILABLE = False
@@ -28,6 +30,7 @@ except ImportError:
 
 try:
     from agentensemble.llm.mistral_provider import MistralLLMProvider
+
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
@@ -45,10 +48,10 @@ class ReActAgent(BaseAgent):
     def __init__(
         self,
         name: str = "react_agent",
-        tools: Optional[List[Any]] = None,
+        tools: list[Any] | None = None,
         max_iterations: int = 10,
-        llm: Optional[LLMProvider] = None,
-        session: Optional[Any] = None,
+        llm: LLMProvider | None = None,
+        session: Any | None = None,
         **kwargs: Any,
     ):
         """
@@ -66,9 +69,14 @@ class ReActAgent(BaseAgent):
         self.llm = llm
         self.session = session
         if self.llm is None and LLM_AVAILABLE and MistralLLMProvider:
-            self.llm = MistralLLMProvider(temperature=0.2)
+            try:
+                self.llm = MistralLLMProvider(temperature=0.2)
+            except (ValueError, ImportError):
+                # No API key yet: the agent can still be constructed and inspected;
+                # run()/stream() raise a clear RuntimeError until an LLM is available.
+                self.llm = None
 
-    def run(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    def run(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute ReAct agent (synchronous).
 
@@ -81,7 +89,7 @@ class ReActAgent(BaseAgent):
         """
         return asyncio.run(self._run_loop(query, **kwargs))
 
-    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute ReAct agent (asynchronous).
 
@@ -94,9 +102,7 @@ class ReActAgent(BaseAgent):
         """
         return await self._run_loop(query, **kwargs)
 
-    async def astream(
-        self, query: str, **kwargs: Any
-    ) -> AsyncIterator[Dict[str, Any]]:
+    async def astream(self, query: str, **kwargs: Any) -> AsyncIterator[dict[str, Any]]:
         """
         Stream execution events for real-time UX.
 
@@ -107,9 +113,7 @@ class ReActAgent(BaseAgent):
         async for event in self._stream_loop(query, **kwargs):
             yield event
 
-    async def _stream_loop(
-        self, query: str, **kwargs: Any
-    ) -> AsyncIterator[Dict[str, Any]]:
+    async def _stream_loop(self, query: str, **kwargs: Any) -> AsyncIterator[dict[str, Any]]:
         """Stream events during ReAct loop."""
         if self.llm is None:
             raise RuntimeError(
@@ -121,7 +125,7 @@ class ReActAgent(BaseAgent):
         tool_map = {t.name: t for t in self.tools} if self.tools else {}
 
         system_prompt = self.llm.get_react_system_prompt(tool_schemas, self.max_iterations)
-        messages: List[LLMMessage] = [
+        messages: list[LLMMessage] = [
             LLMMessage(role="system", content=system_prompt),
             LLMMessage(role="user", content=query),
         ]
@@ -186,17 +190,19 @@ class ReActAgent(BaseAgent):
             },
         }
 
-    def _session_to_messages(self, limit: int = 20) -> List[LLMMessage]:
+    def _session_to_messages(self, limit: int = 20) -> list[LLMMessage]:
         """Load session history and convert to LLMMessage list."""
         if not self.session:
             return []
         raw = self.session.get_messages(limit=limit)
-        out: List[LLMMessage] = []
+        out: list[LLMMessage] = []
         for m in raw:
             tc = None
             if m.get("tool_calls"):
                 tc = [
-                    ToolCall(id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {}))
+                    ToolCall(
+                        id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {})
+                    )
                     for x in m["tool_calls"]
                 ]
             out.append(
@@ -209,39 +215,54 @@ class ReActAgent(BaseAgent):
             )
         return out
 
-    def _messages_to_session(self, to_save: List[LLMMessage]) -> None:
+    def _messages_to_session(self, to_save: list[LLMMessage]) -> None:
         """Save messages to session."""
         if not self.session:
             return
         raw = []
         for m in to_save:
-            d: Dict[str, Any] = {"role": m.role, "content": m.content if isinstance(m.content, str) else ""}
+            d: dict[str, Any] = {
+                "role": m.role,
+                "content": m.content if isinstance(m.content, str) else "",
+            }
             if m.tool_call_id:
                 d["tool_call_id"] = m.tool_call_id
             if m.tool_calls:
-                d["tool_calls"] = [{"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls]
+                d["tool_calls"] = [
+                    {"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls
+                ]
             raw.append(d)
         self.session.add_messages(raw)
 
-    def _messages_to_dicts(self, msgs: List[LLMMessage]) -> List[Dict[str, Any]]:
+    def _messages_to_dicts(self, msgs: list[LLMMessage]) -> list[dict[str, Any]]:
         """Serialize messages for run_state (human-in-loop resume)."""
         out = []
         for m in msgs:
-            d: Dict[str, Any] = {"role": m.role, "content": m.content if isinstance(m.content, str) else ""}
+            d: dict[str, Any] = {
+                "role": m.role,
+                "content": m.content if isinstance(m.content, str) else "",
+            }
             if m.tool_call_id:
                 d["tool_call_id"] = m.tool_call_id
             if m.tool_calls:
-                d["tool_calls"] = [{"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls]
+                d["tool_calls"] = [
+                    {"id": t.id, "name": t.name, "arguments": t.arguments} for t in m.tool_calls
+                ]
             out.append(d)
         return out
 
-    def _dicts_to_messages(self, raw: List[Dict[str, Any]]) -> List[LLMMessage]:
+    def _dicts_to_messages(self, raw: list[dict[str, Any]]) -> list[LLMMessage]:
         """Deserialize messages from run_state."""
-        out: List[LLMMessage] = []
+        out: list[LLMMessage] = []
         for m in raw:
             tc = None
             if m.get("tool_calls"):
-                tc = [ToolCall(id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {})) for x in m["tool_calls"]]
+                tc = [
+                    ToolCall(
+                        id=x.get("id", ""), name=x.get("name", ""), arguments=x.get("arguments", {})
+                    )
+                    for x in m["tool_calls"]
+                ]
             out.append(
                 LLMMessage(
                     role=m["role"],
@@ -252,7 +273,7 @@ class ReActAgent(BaseAgent):
             )
         return out
 
-    async def _run_loop(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    async def _run_loop(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Async ReAct loop: Reason -> Act -> Observe until final answer."""
         if self.llm is None:
             raise RuntimeError(
@@ -271,9 +292,13 @@ class ReActAgent(BaseAgent):
             state = AgentState(**resume_state["state"])
             pending = resume_state["pending_tc"]
             messages.append(
-                LLMMessage(role="tool", content=str(resume_value), tool_call_id=pending.get("id", ""))
+                LLMMessage(
+                    role="tool", content=str(resume_value), tool_call_id=pending.get("id", "")
+                )
             )
-            state = self._update_state(state, tool_calls=[{"name": pending.get("name", ""), "result": str(resume_value)}])
+            state = self._update_state(
+                state, tool_calls=[{"name": pending.get("name", ""), "result": str(resume_value)}]
+            )
         else:
             state = AgentState(query=query, context=kwargs.get("context", {}))
             history = self._session_to_messages()
@@ -291,12 +316,16 @@ class ReActAgent(BaseAgent):
         tool_schemas = get_tool_schemas(self.tools) if self.tools else []
         tool_map = {t.name: t for t in self.tools} if self.tools else {}
         history_len = len(self._session_to_messages())
-        total_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        total_usage: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
         if trace_hooks and TRACING_AVAILABLE:
-            trace_hooks.emit(TraceEvent(type=TraceEventType.RUN_START, agent=self.name, data={"query": query[:200]}))
+            trace_hooks.emit(
+                TraceEvent(
+                    type=TraceEventType.RUN_START, agent=self.name, data={"query": query[:200]}
+                )
+            )
 
-        for iteration in range(self.max_iterations):
+        for _iteration in range(self.max_iterations):
             if not self._validate_state(state):
                 break
 
@@ -305,7 +334,9 @@ class ReActAgent(BaseAgent):
 
             llm_start = time.perf_counter()
             if trace_hooks and TRACING_AVAILABLE:
-                trace_hooks.emit(TraceEvent(type=TraceEventType.LLM_START, agent=self.name, data={}))
+                trace_hooks.emit(
+                    TraceEvent(type=TraceEventType.LLM_START, agent=self.name, data={})
+                )
 
             response = await self.llm.agenerate(
                 messages,
@@ -317,7 +348,7 @@ class ReActAgent(BaseAgent):
                 for k in total_usage:
                     total_usage[k] = total_usage.get(k, 0) + response.usage.get(k, 0)
             if trace_hooks and TRACING_AVAILABLE:
-                llm_data: Dict[str, Any] = {}
+                llm_data: dict[str, Any] = {}
                 if response.usage:
                     llm_data["usage"] = response.usage
                     if estimate_cost:
@@ -334,14 +365,22 @@ class ReActAgent(BaseAgent):
 
             if response.tool_calls:
                 messages.append(
-                    LLMMessage(role="assistant", content=response.content or "", tool_calls=response.tool_calls)
+                    LLMMessage(
+                        role="assistant",
+                        content=response.content or "",
+                        tool_calls=response.tool_calls,
+                    )
                 )
                 for tc in response.tool_calls:
                     if interrupt_tools and tc.name in interrupt_tools:
                         run_state = {
                             "messages": self._messages_to_dicts(messages),
                             "state": state.model_dump(),
-                            "pending_tc": {"id": tc.id or f"call_{tc.name}", "name": tc.name, "arguments": tc.arguments},
+                            "pending_tc": {
+                                "id": tc.id or f"call_{tc.name}",
+                                "name": tc.name,
+                                "arguments": tc.arguments,
+                            },
                         }
                         return {
                             "__interrupted__": True,
@@ -351,7 +390,13 @@ class ReActAgent(BaseAgent):
 
                     tool_start = time.perf_counter()
                     if trace_hooks and TRACING_AVAILABLE:
-                        trace_hooks.emit(TraceEvent(type=TraceEventType.TOOL_START, agent=self.name, data={"tool": tc.name}))
+                        trace_hooks.emit(
+                            TraceEvent(
+                                type=TraceEventType.TOOL_START,
+                                agent=self.name,
+                                data={"tool": tc.name},
+                            )
+                        )
 
                     tool = tool_map.get(tc.name)
                     if tool:
@@ -374,19 +419,23 @@ class ReActAgent(BaseAgent):
                         )
 
                     messages.append(
-                        LLMMessage(role="tool", content=result_str, tool_call_id=tc.id or f"call_{tc.name}")
+                        LLMMessage(
+                            role="tool", content=result_str, tool_call_id=tc.id or f"call_{tc.name}"
+                        )
                     )
-                    state = self._update_state(state, tool_calls=[{"name": tc.name, "result": result_str}])
+                    state = self._update_state(
+                        state, tool_calls=[{"name": tc.name, "result": result_str}]
+                    )
             else:
                 state.result = response.content or state.result
                 break
 
         if self.session:
-            to_save = messages[history_len + 2:]
+            to_save = messages[history_len + 2 :]
             if to_save:
                 self._messages_to_session(to_save)
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "iterations": state.iteration_count,
             "tool_calls": len(state.tool_calls),
             "agent": self.name,
@@ -402,7 +451,11 @@ class ReActAgent(BaseAgent):
                 TraceEvent(
                     type=TraceEventType.RUN_END,
                     agent=self.name,
-                    data={"query": query[:200], "usage": total_usage, "result_preview": str(state.result or "")[:200]},
+                    data={
+                        "query": query[:200],
+                        "usage": total_usage,
+                        "result_preview": str(state.result or "")[:200],
+                    },
                 )
             )
 

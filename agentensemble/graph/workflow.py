@@ -4,9 +4,10 @@ Workflow Graph
 Composable graph-based workflows with nodes and conditional edges.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
-Node = Union[str, Callable[[Dict[str, Any]], Dict[str, Any]]]
+Node = str | Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class Edge:
@@ -16,7 +17,7 @@ class Edge:
         self,
         source: str,
         target: str,
-        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        condition: Callable[[dict[str, Any]], bool] | None = None,
     ):
         self.source = source
         self.target = target
@@ -32,10 +33,10 @@ class WorkflowGraph:
 
     def __init__(
         self,
-        nodes: Optional[Dict[str, Node]] = None,
-        edges: Optional[List[Edge]] = None,
+        nodes: dict[str, Node] | None = None,
+        edges: list[Edge] | None = None,
         entry: str = "start",
-        exit_nodes: Optional[List[str]] = None,
+        exit_nodes: list[str] | None = None,
     ):
         self.nodes = nodes or {}
         self.edges = edges or []
@@ -47,14 +48,16 @@ class WorkflowGraph:
         self.nodes[name] = node
         return self
 
-    def add_edge(self, source: str, target: str, condition: Optional[Callable] = None) -> "WorkflowGraph":
+    def add_edge(
+        self, source: str, target: str, condition: Callable | None = None
+    ) -> "WorkflowGraph":
         """Add an edge. Chainable."""
         self.edges.append(Edge(source, target, condition))
         return self
 
-    def run(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(self, query: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute the workflow."""
-        state: Dict[str, Any] = {
+        state: dict[str, Any] = {
             "query": query,
             "context": context or {},
             "result": None,

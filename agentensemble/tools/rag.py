@@ -9,9 +9,8 @@ Supports:
 - RAG Chain: Two-step chain with single LLM call
 """
 
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
-import os
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -20,11 +19,11 @@ load_dotenv()
 try:
     from langchain_community.document_loaders import WebBaseLoader
     from langchain_community.vectorstores import Chroma
+    from langchain_core.documents import Document
+    from langchain_core.tools import tool
     from langchain_core.vectorstores import InMemoryVectorStore
     from langchain_mistralai import MistralAIEmbeddings
-    from langchain_core.documents import Document
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_core.tools import tool
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
@@ -51,8 +50,8 @@ class RAGTool:
 
     def __init__(
         self,
-        vector_store: Optional[Any] = None,
-        embeddings: Optional[Any] = None,
+        vector_store: Any | None = None,
+        embeddings: Any | None = None,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         fallback_strategies: int = 3,
@@ -76,7 +75,7 @@ class RAGTool:
         self.chunk_overlap = chunk_overlap
         self.fallback_strategies = fallback_strategies
         self.config = kwargs
-        self._text_splitter: Optional[Any] = None
+        self._text_splitter: Any | None = None
 
     def _initialize_components(self) -> None:
         """Initialize text splitter and ensure embeddings/vector store exist"""
@@ -104,7 +103,7 @@ class RAGTool:
             if InMemoryVectorStore and self.embeddings:
                 self.vector_store = InMemoryVectorStore(self.embeddings)
 
-    def index_documents(self, urls: List[str]) -> None:
+    def index_documents(self, urls: list[str]) -> None:
         """
         Index documents from URLs (following LangChain RAG tutorial pattern).
 
@@ -171,7 +170,7 @@ class RAGTool:
 
         return retrieve_context
 
-    def retrieve(self, query: str, k: int = 2) -> Tuple[str, List[Document]]:
+    def retrieve(self, query: str, k: int = 2) -> tuple[str, list[Document]]:
         """
         Retrieve context for a query (following LangChain RAG tutorial pattern).
 
@@ -191,7 +190,7 @@ class RAGTool:
         )
         return serialized, retrieved_docs
 
-    def run(self, question: str, urls: Optional[List[str]] = None, **kwargs) -> str:
+    def run(self, question: str, urls: list[str] | None = None, **kwargs) -> str:
         """
         Execute RAG query (simple interface for backward compatibility).
 
@@ -221,6 +220,6 @@ class RAGTool:
 
         return f"RAG answer to '{question}' [index documents first with index_documents()]"
 
-    def __call__(self, question: str, urls: Optional[List[str]] = None, **kwargs) -> str:
+    def __call__(self, question: str, urls: list[str] | None = None, **kwargs) -> str:
         """Make tool callable"""
         return self.run(question, urls, **kwargs)

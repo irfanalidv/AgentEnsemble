@@ -5,7 +5,7 @@ Decomposes complex tasks into subtasks for executor agents.
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 from agentensemble.core.protocol import AgentProtocol
@@ -21,7 +21,7 @@ class PlannerAgent(BaseAgent):
     def __init__(
         self,
         name: str = "planner",
-        executor: Optional[AgentProtocol] = None,
+        executor: AgentProtocol | None = None,
         max_subtasks: int = 10,
         **kwargs: Any,
     ):
@@ -29,19 +29,20 @@ class PlannerAgent(BaseAgent):
         self.executor = executor
         self.max_subtasks = max_subtasks
 
-    def run(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    def run(self, query: str, **kwargs: Any) -> dict[str, Any]:
         return asyncio.run(self.arun(query, **kwargs))
 
-    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]:
         subtasks = self._decompose(query)
         if not self.executor:
             return {
-                "result": f"Planned {len(subtasks)} subtasks (no executor): " + "; ".join(subtasks[:3]),
+                "result": f"Planned {len(subtasks)} subtasks (no executor): "
+                + "; ".join(subtasks[:3]),
                 "metadata": {"subtasks": subtasks, "executed": 0},
             }
 
-        results: List[Dict[str, Any]] = []
-        for i, st in enumerate(subtasks[: self.max_subtasks]):
+        results: list[dict[str, Any]] = []
+        for st in subtasks[: self.max_subtasks]:
             r = await self.executor.arun(st, **kwargs)
             results.append({"subtask": st, "result": r.get("result", "")})
 
@@ -55,7 +56,7 @@ class PlannerAgent(BaseAgent):
             },
         }
 
-    def _decompose(self, query: str) -> List[str]:
+    def _decompose(self, query: str) -> list[str]:
         """Decompose task into subtasks. Override for LLM-based planning."""
         # Simple rule-based decomposition
         q = query.lower()
@@ -72,7 +73,7 @@ class PlannerAgent(BaseAgent):
             ]
         return [query]
 
-    def _aggregate(self, results: List[Dict[str, Any]]) -> str:
+    def _aggregate(self, results: list[dict[str, Any]]) -> str:
         """Aggregate subtask results. Override for custom logic."""
         parts = [r.get("result", "") for r in results if r.get("result")]
         return "\n\n---\n\n".join(parts) if parts else "No results"

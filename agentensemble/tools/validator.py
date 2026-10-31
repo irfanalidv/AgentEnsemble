@@ -5,7 +5,7 @@ Data validation and quality assurance for agent outputs.
 """
 
 import re
-from typing import Any, List, Optional
+from typing import Any
 
 
 class ValidationTool:
@@ -18,10 +18,10 @@ class ValidationTool:
     def __init__(
         self,
         validation_mode: str = "fast",
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        required_pattern: Optional[str] = None,
-        reject_pattern: Optional[str] = None,
+        min_length: int | None = None,
+        max_length: int | None = None,
+        required_pattern: str | None = None,
+        reject_pattern: str | None = None,
     ):
         """
         Initialize validation tool.
@@ -43,7 +43,7 @@ class ValidationTool:
     def run(
         self,
         value: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """
@@ -57,7 +57,7 @@ class ValidationTool:
         Returns:
             Validation result with valid, confidence, justifications
         """
-        justifications: List[str] = []
+        justifications: list[str] = []
         valid = True
 
         # Non-empty check
@@ -88,9 +88,7 @@ class ValidationTool:
             if self.reject_pattern and valid:
                 if self.reject_pattern.search(text):
                     valid = False
-                    justifications.append(
-                        f"Rejected pattern '{self.reject_pattern.pattern}' found"
-                    )
+                    justifications.append(f"Rejected pattern '{self.reject_pattern.pattern}' found")
 
             # Deep mode: additional quality checks
             if self.validation_mode == "deep" and valid:
@@ -113,7 +111,7 @@ class ValidationTool:
     def __call__(
         self,
         value: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Make tool callable."""

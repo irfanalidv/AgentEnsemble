@@ -2,8 +2,7 @@
 
 import pytest
 
-from agentensemble.runner import Runner, RunConfig, RunHooks
-from agentensemble.agents import StateGraphAgent
+from agentensemble.runner import RunConfig, RunHooks, Runner
 
 
 class MockAgent:
@@ -63,7 +62,7 @@ class TestRunner:
             ended.append(r)
 
         config = RunConfig(hooks=RunHooks(on_start=on_start, on_end=on_end))
-        result = Runner.run(agent, "test", config=config)
+        Runner.run(agent, "test", config=config)
         assert len(started) == 1
         assert started[0][0] == "test"
         assert len(ended) == 1

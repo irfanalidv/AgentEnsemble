@@ -5,7 +5,7 @@ Custom graph-based workflow with nodes and routing.
 Use case: Multi-step analysis pipelines.
 """
 
-from agentensemble.agents import StateGraphAgent, AgentState
+from agentensemble.agents import AgentState, StateGraphAgent
 
 
 def analyze_node(state: AgentState) -> dict:
@@ -45,7 +45,6 @@ def main():
     )
 
     # Override routing: start -> analyze -> process -> end
-    original_route = agent._route
 
     def custom_route(state, current):
         if state.result:

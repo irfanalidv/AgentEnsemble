@@ -9,12 +9,10 @@ Research basis:
 - LangChain bind_tools: Accepts functions, Pydantic models, BaseTool
 """
 
-from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
-
-from pydantic import BaseModel
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 from agentensemble.llm.interface import ToolSchema
-
 
 # -----------------------------------------------------------------------------
 # Tool Protocol
@@ -53,8 +51,8 @@ class Tool(Protocol):
 
 def _infer_schema_from_func(
     func: Callable[..., Any],
-    name: Optional[str] = None,
-    description: Optional[str] = None,
+    name: str | None = None,
+    description: str | None = None,
 ) -> ToolSchema:
     """
     Infer JSON Schema from function signature and docstring.
@@ -63,7 +61,6 @@ def _infer_schema_from_func(
     Compatible with OpenAI/Anthropic function calling format.
     """
     import inspect
-    import json
 
     sig = inspect.signature(func)
     doc = inspect.getdoc(func) or ""
@@ -71,7 +68,7 @@ def _infer_schema_from_func(
     desc = description or doc.split("\n")[0].strip() or f"Execute {func.__name__}"
     tool_name = name or func.__name__
 
-    properties: Dict[str, Any] = {}
+    properties: dict[str, Any] = {}
     required: list = []
 
     for param_name, param in sig.parameters.items():
@@ -84,17 +81,17 @@ def _infer_schema_from_func(
         ann = param.annotation
         if ann is inspect.Parameter.empty:
             schema_type = "string"
-        elif ann == str:
+        elif ann is str:
             schema_type = "string"
-        elif ann == int:
+        elif ann is int:
             schema_type = "integer"
-        elif ann == float:
+        elif ann is float:
             schema_type = "number"
-        elif ann == bool:
+        elif ann is bool:
             schema_type = "boolean"
-        elif ann == list:
+        elif ann is list:
             schema_type = "array"
-        elif ann == dict:
+        elif ann is dict:
             schema_type = "object"
         else:
             schema_type = "string"

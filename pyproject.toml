@@ -1,13 +1,15 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentensemble"
-version = "0.3.0"
-description = "Orchestrate AI agents in perfect harmony - A comprehensive Python framework for building, testing, and orchestrating multi-agent AI systems"
+version = "0.4.0"
+description = "Build, orchestrate, trace, and test multi-agent LLM systems in Python: ReAct, RAG, router, planner, workflow graphs, swarms, debates, and pipelines."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Irfan Ali", email = "irfanali29@hotmail.com"}
 ]
@@ -17,34 +19,44 @@ maintainers = [
 keywords = [
     "ai-agents",
     "multi-agent",
+    "multi-agent-systems",
+    "agent-orchestration",
     "orchestration",
-    "langgraph",
+    "llm",
     "langchain",
+    "langgraph",
+    "mistral",
     "rag",
+    "react-agent",
+    "tool-calling",
+    "function-calling",
     "agent-testing",
     "agentic-ai",
     "state-graph",
-    "react-agent"
+    "workflow",
+    "tracing",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
 ]
-license = {text = "MIT"}
 
 dependencies = [
-    "langchain>=0.1.0",  # Structured output requires langchain>=1.1 (optional)
-    "langchain-core>=0.1.0",
-    "langchain-community>=0.0.20",
-    "langchain-mistralai>=0.1.0",
-    "langgraph>=0.0.20",
+    "langchain>=1.1.0",
+    "langchain-core>=1.0.0",
+    "langchain-community>=0.3.0",
+    "langchain-mistralai>=0.2.0",
     "pydantic>=2.0.0",
     "typing-extensions>=4.5.0",
     "python-dotenv>=1.0.0",
@@ -54,10 +66,11 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
     "pytest-cov>=4.0.0",
+    "ruff>=0.6.0",
+    "mypy>=1.0.0",
+    "build>=1.0.0",
+    "twine>=5.0.0",
 ]
 observability = [
     "langsmith>=0.1.0",
@@ -68,14 +81,13 @@ rag = [
     "sentence-transformers>=2.2.0",
     "langchain-text-splitters>=0.0.1",
     "beautifulsoup4>=4.12.0",
-    "langchain-mistralai>=0.1.0",
 ]
 search = [
-    "duckduckgo-search>=4.0.0",  # Fallback search option
-    "google-search-results>=2.4.2",  # Serper API (default if API key provided)
+    "ddgs>=9.0.0",  # DuckDuckGo backend used by langchain-community (free fallback search)
+    "google-search-results>=2.4.2",
 ]
 all = [
-    "agentensemble[dev,observability,rag,search]",
+    "agentensemble[observability,rag,search]",
 ]
 
 [project.urls]
@@ -83,28 +95,28 @@ Homepage = "https://github.com/irfanalidv/AgentEnsemble"
 Documentation = "https://github.com/irfanalidv/AgentEnsemble#readme"
 Repository = "https://github.com/irfanalidv/AgentEnsemble"
 Issues = "https://github.com/irfanalidv/AgentEnsemble/issues"
+Changelog = "https://github.com/irfanalidv/AgentEnsemble/blob/main/CHANGELOG.md"
 
-[tool.setuptools]
-packages = ["agentensemble", "agentensemble.agents", "agentensemble.orchestration", "agentensemble.tools", "agentensemble.testing", "agentensemble.utils", "agentensemble.llm", "agentensemble.memory", "agentensemble.core", "agentensemble.router", "agentensemble.planner", "agentensemble.graph", "agentensemble.tracing"]
-license-files = []
+[tool.setuptools.packages.find]
+include = ["agentensemble*"]
 
 [tool.setuptools.package-data]
 agentensemble = ["py.typed"]
 
-[tool.black]
-line-length = 100
-target-version = ['py39', 'py310', 'py311', 'py312']
-
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501"]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*" = ["E402"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

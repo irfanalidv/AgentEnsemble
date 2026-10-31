@@ -4,7 +4,7 @@ Graph Workflow Example
 WorkflowGraph for composable, graph-based workflows with conditional edges.
 """
 
-from agentensemble import WorkflowGraph, Edge
+from agentensemble import WorkflowGraph
 
 
 def analyze_node(state):

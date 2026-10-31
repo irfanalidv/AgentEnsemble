@@ -4,30 +4,30 @@ Benchmark Suite
 Pre-defined test cases for agent evaluation.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 
 class Benchmark:
     """
     Benchmark suite for agent testing.
-    
+
     Provides pre-defined test cases for different scenarios.
     """
-    
-    def __init__(self, test_cases: List[Dict[str, Any]]):
+
+    def __init__(self, test_cases: list[dict[str, Any]]):
         """
         Initialize benchmark.
-        
+
         Args:
             test_cases: List of test case dictionaries
         """
         self.test_cases = test_cases
-    
+
     @classmethod
     def research_tasks(cls) -> "Benchmark":
         """
         Research tasks benchmark.
-        
+
         Returns:
             Benchmark with research-oriented test cases
         """
@@ -49,12 +49,12 @@ class Benchmark:
             },
         ]
         return cls(test_cases)
-    
+
     @classmethod
     def data_extraction_tasks(cls) -> "Benchmark":
         """
         Data extraction tasks benchmark.
-        
+
         Returns:
             Benchmark with extraction-oriented test cases
         """
@@ -66,15 +66,15 @@ class Benchmark:
             },
         ]
         return cls(test_cases)
-    
+
     @classmethod
     def load(cls, name: str) -> "Benchmark":
         """
         Load a benchmark by name.
-        
+
         Args:
             name: Benchmark name
-            
+
         Returns:
             Benchmark instance
         """
@@ -84,4 +84,3 @@ class Benchmark:
             return cls.data_extraction_tasks()
         else:
             raise ValueError(f"Unknown benchmark: {name}")
-

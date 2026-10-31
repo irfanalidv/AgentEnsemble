@@ -1,13 +1,83 @@
+<div align="center">
+
 # AgentEnsemble
 
-**Production-ready multi-agent orchestration for Python**
+**Build, orchestrate, trace, and test multi-agent LLM systems in Python.**
 
-AgentEnsemble is a modern framework for building and orchestrating AI agent systems. Designed for clarity, extensibility, and production use—comparable to LangGraph, CrewAI, and AutoGen.
+ReAct, RAG, router, planner, workflow graphs, swarms, debates, and pipelines, with sessions,
+tracing, retries, and human-in-the-loop approval built in.
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/agentensemble)](https://pypi.org/project/agentensemble/)
+[![PyPI version](https://img.shields.io/pypi/v/agentensemble.svg)](https://pypi.org/project/agentensemble/)
+[![Python versions](https://img.shields.io/pypi/pyversions/agentensemble.svg)](https://pypi.org/project/agentensemble/)
+[![Tests](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/tests.yml/badge.svg)](https://github.com/irfanalidv/AgentEnsemble/actions/workflows/tests.yml)
 [![PyPI Downloads](https://static.pepy.tech/badge/agentensemble)](https://pepy.tech/projects/agentensemble)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+</div>
+
+---
+
+AgentEnsemble is a framework for building and orchestrating AI agent systems, designed for clarity,
+extensibility, and production use. It covers similar ground to LangGraph, CrewAI, and AutoGen.
+
+## Installation
+
+```bash
+pip install agentensemble                 # core: agents, orchestration, graphs, memory, tracing
+pip install "agentensemble[search]"       # + DuckDuckGo / Serper web search for SearchTool
+pip install "agentensemble[rag]"          # + Chroma, sentence-transformers, loaders for RAGTool
+pip install "agentensemble[observability]" # + LangSmith / OpenTelemetry
+pip install "agentensemble[all]"          # everything above
+```
+
+Requires Python 3.10+.
+
+## Quick start (no API key needed)
+
+Graph workflows, state-graph agents, and the planner run without any LLM:
+
+```python
+from agentensemble import WorkflowGraph
+
+
+def analyze(s):
+    return {"context": {**s.get("context", {}), "done": True}, "current_node": "summarize"}
+
+
+def summarize(s):
+    return {"result": f"Summary for: {s['query']}", "current_node": "end"}
+
+
+graph = (
+    WorkflowGraph(entry="start", exit_nodes=["end"])
+    .add_node("start", lambda s: {"current_node": "analyze"})
+    .add_node("analyze", analyze)
+    .add_node("summarize", summarize)
+    .add_edge("start", "analyze")
+    .add_edge("analyze", "summarize")
+    .add_edge("summarize", "end")
+)
+print(graph.run("What is multi-agent AI?")["result"])
+# Summary for: What is multi-agent AI?
+```
+
+LLM-powered agents (`ReActAgent`, `HybridAgent`, `RouterAgent`, `StructuredAgent`) use Mistral by
+default. Set `MISTRAL_API_KEY`, or pass any `LLMProvider` implementation via `llm=...`.
+
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `MISTRAL_API_KEY` | Required for the default Mistral LLM provider (ReAct, Hybrid, Router, Structured agents). |
+| `MISTRAL_MODEL` | Optional default model for `MistralLLMProvider` (default: `mistral-large-latest`). Use e.g. `mistral-small-latest` if your plan doesn't include the large model. |
+| `SERPER_API_KEY` | Optional. When set, `SearchTool()` uses Serper; otherwise it falls back to DuckDuckGo (needs the `search` extra). |
+
+Copy `.env.example` to `.env` and fill in your keys (`KEY=value`, no spaces around `=`); the
+package loads `.env` automatically via `python-dotenv`.
+
+Without an API key, LLM agents can still be constructed (and inspected or registered); calling
+`run()` raises a clear `RuntimeError` explaining how to configure an LLM.
 
 ---
 
@@ -23,7 +93,7 @@ AgentEnsemble is a modern framework for building and orchestrating AI agent syst
 ## Architecture
 
 <p align="center">
-  <img src="docs/agentensemble-architecture.png" alt="AgentEnsemble Architecture" width="900"/>
+  <img src="https://raw.githubusercontent.com/irfanalidv/AgentEnsemble/main/docs/agentensemble-architecture.png" alt="AgentEnsemble Architecture" width="900"/>
 </p>
 
 ### Framework layers
@@ -63,11 +133,11 @@ AgentEnsemble is a modern framework for building and orchestrating AI agent syst
 
 ---
 
-## Quick Start
+## LLM quick start
 
 ```bash
-pip install agentensemble
-# Optional: pip install agentensemble[search,rag]
+pip install "agentensemble[search]"
+export MISTRAL_API_KEY=...
 ```
 
 ```python
@@ -84,7 +154,7 @@ print(result["result"])
 
 ## Examples — Code + Output
 
-Each example is runnable. Requires `.env` with `MISTRAL_API_KEY` and `SERPER_API_KEY` (see `.env.example` for format).
+Each example is runnable. Requires `MISTRAL_API_KEY` (and the `search` extra for `SearchTool`; `SERPER_API_KEY` is optional). Outputs below are from the author's runs; LLM answers will vary.
 
 ---
 
@@ -113,9 +183,11 @@ enable machine learning with artificial neural networks.
 ```python
 from agentensemble import ReActAgent, SearchTool, function_tool
 
+
 @function_tool(description="Get current weather for a city")
 def get_weather(city: str) -> str:
     return f"Weather in {city}: 72°F, partly cloudy"
+
 
 agent = ReActAgent(tools=[SearchTool(), get_weather], max_iterations=4)
 result = agent.run("What is the weather in Paris?")
@@ -229,7 +301,9 @@ researcher = ReActAgent(name="researcher", tools=[SearchTool()], max_iterations=
 validator = ReActAgent(name="validator", tools=[SearchTool()], max_iterations=2)
 
 router = RouterAgent(agents={"researcher": researcher, "validator": validator})
-ensemble = Ensemble(conductor="supervisor", agents={"researcher": researcher, "validator": validator}, router=router)
+ensemble = Ensemble(
+    conductor="supervisor", agents={"researcher": researcher, "validator": validator}, router=router
+)
 result = ensemble.perform("Latest developments in quantum computing")
 for name, r in result["results"].items():
     print(f"Routed to {name}: {r['result'][:120]}...")
@@ -249,8 +323,10 @@ Routed to researcher: Here are the latest developments in quantum computing:
 ```python
 from agentensemble import PlannerAgent, StateGraphAgent
 
+
 def worker(state):
     return {"result": f"Processed: {state.query}"}
+
 
 executor = StateGraphAgent(name="worker", nodes={"start": worker})
 executor._route = lambda s, c: "end"
@@ -276,11 +352,14 @@ Result: Processed: Search for information... --- Processed: Summarize key findin
 ```python
 from agentensemble import WorkflowGraph
 
+
 def analyze(s):
     return {"context": {**s.get("context", {}), "done": True}, "current_node": "summarize"}
 
+
 def summarize(s):
     return {"result": f"Summary for: {s['query']}", "current_node": "end"}
+
 
 graph = (
     WorkflowGraph(entry="start", exit_nodes=["end"])
@@ -311,8 +390,14 @@ from agentensemble import ReActAgent, Runner, RunConfig, RunHooks, InMemorySessi
 session = InMemorySession(session_id="chat-1")
 agent = ReActAgent(name="chatbot", tools=[SearchTool()], session=session, max_iterations=3)
 
-def on_start(q, _): print(f"→ User: {q[:50]}...")
-def on_end(r): print(f"← Agent: {r['result'][:80]}...\n")
+
+def on_start(q, _):
+    print(f"→ User: {q[:50]}...")
+
+
+def on_end(r):
+    print(f"← Agent: {r['result'][:80]}...\n")
+
 
 config = RunConfig(hooks=RunHooks(on_start=on_start, on_end=on_end))
 
@@ -365,9 +450,11 @@ Events: ['run_start', 'llm_start', 'llm_end', 'tool_start', 'tool_end', 'llm_sta
 ```python
 from agentensemble import ReActAgent, Runner, RunConfig, function_tool
 
+
 @function_tool(description="Execute a payment")
 def execute_payment(amount: float, recipient: str) -> str:
     return f"Paid ${amount} to {recipient}"
+
 
 agent = ReActAgent(tools=[execute_payment], max_iterations=2)
 config = RunConfig(interrupt_before_tools=["execute_payment"])
@@ -377,7 +464,9 @@ result = Runner.run(agent, "Pay $50 to Alice", config=config)
 if result.get("__interrupted__"):
     print("Paused for approval:", result["pending_tool"])
     # Simulate human approval
-    result = Runner.run(agent, "...", config=config, resume=result["run_state"], resume_value="Paid $50 to Alice")
+    result = Runner.run(
+        agent, "...", config=config, resume=result["run_state"], resume_value="Paid $50 to Alice"
+    )
 print(result["result"])
 ```
 
@@ -417,10 +506,12 @@ manageable subtasks that can be executed by specialized agents...
 from pydantic import BaseModel, Field
 from agentensemble import StructuredAgent
 
+
 class ProductReview(BaseModel):
     product: str = Field(description="Product name")
     rating: int = Field(description="1-5 stars")
     summary: str = Field(description="Brief summary")
+
 
 agent = StructuredAgent(response_format=ProductReview)
 result = agent.run("Review: iPhone 15 Pro - 5 stars, excellent camera and battery")
@@ -438,9 +529,15 @@ ProductReview(product='iPhone 15 Pro', rating=5, summary='Excellent camera and b
 
 ```python
 from agentensemble import (
-    ReActAgent, PlannerAgent, StateGraphAgent,
-    SwarmOrchestrator, DebateOrchestrator,
-    Runner, RunConfig, RunHooks, SearchTool,
+    ReActAgent,
+    PlannerAgent,
+    StateGraphAgent,
+    SwarmOrchestrator,
+    DebateOrchestrator,
+    Runner,
+    RunConfig,
+    RunHooks,
+    SearchTool,
 )
 
 # 1. Executor: ReActAgent with search
@@ -583,14 +680,26 @@ agentensemble/
 
 ## Documentation
 
-- **[Showcase](examples/showcase_all.py)** — Run all 10 features with real API output
+- **[Showcase](examples/showcase_all.py)** — Run the features end to end with real API calls
+- [Changelog](CHANGELOG.md)
 - [Examples](examples/) — `quickstart`, `react_llm`, `swarm`, `pipeline`, `streaming`, `debate`, `rag`, `research_agent`, `graph_workflow`, `runner`, `structured_output`
 - [Roadmap](docs/ROADMAP_2025.md) — Planned improvements
 
-> **Note:** Ensure `docs/agentensemble-architecture.png` is committed so the architecture diagram renders on GitHub.
-
 ---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/CONTRIBUTING.md)
+and the [Code of Conduct](https://github.com/irfanalidv/AgentEnsemble/blob/main/CODE_OF_CONDUCT.md).
+
+```bash
+git clone https://github.com/irfanalidv/AgentEnsemble.git && cd AgentEnsemble
+pip install -e ".[dev]"
+ruff check . && ruff format --check . && pytest
+```
+
+Security issues: please follow [SECURITY.md](https://github.com/irfanalidv/AgentEnsemble/blob/main/SECURITY.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/irfanalidv/AgentEnsemble/blob/main/LICENSE).

@@ -5,13 +5,13 @@ Compare multiple agent implementations on the same tasks with real metrics.
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 from agentensemble.testing.metrics import Metrics
 
 
-def _is_successful_result(result: Dict[str, Any]) -> bool:
+def _is_successful_result(result: dict[str, Any]) -> bool:
     """Check if agent result is considered successful."""
     if not result:
         return False
@@ -19,7 +19,13 @@ def _is_successful_result(result: Dict[str, Any]) -> bool:
     if not r or not str(r).strip():
         return False
     s = str(r).lower().strip()
-    if s in ("no result", "no result generated", "not found", "no result found", "unable to generate answer"):
+    if s in (
+        "no result",
+        "no result generated",
+        "not found",
+        "no result found",
+        "unable to generate answer",
+    ):
         return False
     if len(s) < 5:
         return False
@@ -34,7 +40,7 @@ class AgentComparison:
     success_rate, avg_execution_time, total_tests.
     """
 
-    def __init__(self, agents: List[BaseAgent]):
+    def __init__(self, agents: list[BaseAgent]):
         """
         Initialize agent comparison.
 
@@ -46,10 +52,10 @@ class AgentComparison:
     def run(
         self,
         benchmark: Any,
-        metrics: Optional[List[str]] = None,
+        metrics: list[str] | None = None,
         use_async: bool = False,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run comparison benchmark.
 
@@ -65,7 +71,7 @@ class AgentComparison:
         import asyncio
 
         metrics_list = metrics or ["success_rate", "execution_time", "total_tests"]
-        results: Dict[str, List[Dict[str, Any]]] = {}
+        results: dict[str, list[dict[str, Any]]] = {}
 
         for agent in self.agents:
             agent_results = []
@@ -82,12 +88,14 @@ class AgentComparison:
                     result = {"result": f"Error: {e}", "metadata": {"error": str(e)}}
                 elapsed = time.perf_counter() - start
 
-                agent_results.append({
-                    "test_case": test_case,
-                    "result": result,
-                    "execution_time": round(elapsed, 3),
-                    "success": _is_successful_result(result),
-                })
+                agent_results.append(
+                    {
+                        "test_case": test_case,
+                        "result": result,
+                        "execution_time": round(elapsed, 3),
+                        "success": _is_successful_result(result),
+                    }
+                )
 
             results[agent.name] = agent_results
 
@@ -99,11 +107,11 @@ class AgentComparison:
 
     def _calculate_summary(
         self,
-        results: Dict[str, List[Dict[str, Any]]],
-        metrics_list: List[str],
-    ) -> Dict[str, Any]:
+        results: dict[str, list[dict[str, Any]]],
+        metrics_list: list[str],
+    ) -> dict[str, Any]:
         """Calculate summary statistics using Metrics."""
-        summary: Dict[str, Any] = {}
+        summary: dict[str, Any] = {}
 
         for agent_name, agent_results in results.items():
             m = Metrics.calculate_all(agent_results)

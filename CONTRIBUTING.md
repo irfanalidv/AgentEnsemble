@@ -5,7 +5,7 @@ Thank you for your interest in contributing to AgentEnsemble! 🎭
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/agentensemble.git`
+2. Clone your fork: `git clone https://github.com/<your-username>/AgentEnsemble.git`
 3. Create a branch: `git checkout -b feature/your-feature-name`
 4. Install development dependencies: `pip install -e ".[dev]"`
 
@@ -19,17 +19,17 @@ pip install -e ".[dev]"
 pytest
 
 # Format code
-black agentensemble/
+ruff format .
 
 # Lint code
-ruff check agentensemble/
+ruff check .
 ```
 
 ## Code Style
 
 - Follow PEP 8
-- Use `black` for formatting (line length: 100)
-- Use `ruff` for linting
+- Use `ruff format` for formatting (line length: 100)
+- Use `ruff check` for linting (CI runs both)
 - Type hints are encouraged
 
 ## Pull Request Process

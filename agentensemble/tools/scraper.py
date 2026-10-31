@@ -4,20 +4,10 @@ Scraper Tool
 Web scraping functionality for agents using LangChain community tools.
 """
 
-from typing import Any, Optional
-
 try:
-    from langchain_community.tools import (
-        DuckDuckGoSearchRun,
-    )
-    from langchain_community.tools.playwright import (
-        ClickTool,
-        ExtractHyperlinksTool,
-        GetElementsTool,
-        NavigateTool,
-        NavigateBackTool,
-    )
+    from langchain_community.tools.playwright import NavigateTool
     from langchain_core.tools import BaseTool
+
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
@@ -33,12 +23,7 @@ class ScraperTool:
     - Simple URL fetching
     """
 
-    def __init__(
-        self,
-        provider: str = "simple",
-        api_key: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, provider: str = "simple", api_key: str | None = None, **kwargs):
         """
         Initialize scraper tool.
 
@@ -50,7 +35,7 @@ class ScraperTool:
         self.name = "scraper"
         self.provider = provider
         self.api_key = api_key
-        self._navigate_tool: Optional[BaseTool] = None
+        self._navigate_tool: BaseTool | None = None
         self._initialize_tool()
 
     def _initialize_tool(self) -> None:
@@ -75,11 +60,10 @@ class ScraperTool:
             self._navigate_tool = None
         else:
             raise ValueError(
-                f"Unknown provider: {self.provider}. "
-                "Supported: 'simple', 'playwright'"
+                f"Unknown provider: {self.provider}. Supported: 'simple', 'playwright'"
             )
 
-    def run(self, url: str, question: Optional[str] = None, **kwargs) -> str:
+    def run(self, url: str, question: str | None = None, **kwargs) -> str:
         """
         Scrape a URL and optionally answer a question.
 
@@ -108,11 +92,11 @@ class ScraperTool:
                 return f"Answer to '{question}' from {url}: [scraped content - install playwright for full functionality]"
             return f"Scraped content from {url} [install playwright for full functionality]"
 
-    def __call__(self, url: str, question: Optional[str] = None, **kwargs) -> str:
+    def __call__(self, url: str, question: str | None = None, **kwargs) -> str:
         """Make tool callable"""
         return self.run(url, question, **kwargs)
 
-    def as_langchain_tool(self) -> Optional[BaseTool]:
+    def as_langchain_tool(self) -> BaseTool | None:
         """
         Return the underlying LangChain tool for direct use.
 
@@ -120,4 +104,3 @@ class ScraperTool:
             LangChain BaseTool instance or None
         """
         return self._navigate_tool
-

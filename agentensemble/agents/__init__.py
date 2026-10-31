@@ -9,14 +9,15 @@ Provides production-ready agent architectures:
 - StructuredAgent: Structured output support (langchain>=1.1 or with_structured_output)
 """
 
-from agentensemble.agents.base import BaseAgent, AgentState
+from agentensemble.agents.base import AgentState, BaseAgent
+from agentensemble.agents.hybrid_agent import HybridAgent
+from agentensemble.agents.rag_agent import RAGAgent
 from agentensemble.agents.react_agent import ReActAgent
 from agentensemble.agents.stategraph_agent import StateGraphAgent
-from agentensemble.agents.rag_agent import RAGAgent
-from agentensemble.agents.hybrid_agent import HybridAgent
 
 try:
     from agentensemble.agents.structured_agent import StructuredAgent
+
     STRUCTURED_AVAILABLE = True
 except ImportError:
     STRUCTURED_AVAILABLE = False

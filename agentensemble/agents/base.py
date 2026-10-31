@@ -6,7 +6,7 @@ Supports both sync (run) and async (arun) execution.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -15,11 +15,11 @@ class AgentState(BaseModel):
     """Base state model for agents."""
 
     query: str
-    context: Dict[str, Any] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
     iteration_count: int = 0
-    tool_calls: List[Dict[str, Any]] = Field(default_factory=list)
-    result: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    result: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class BaseAgent(ABC):
@@ -33,7 +33,7 @@ class BaseAgent(ABC):
     def __init__(
         self,
         name: str,
-        tools: Optional[List[Any]] = None,
+        tools: list[Any] | None = None,
         max_iterations: int = 10,
         **kwargs: Any,
     ):
@@ -52,7 +52,7 @@ class BaseAgent(ABC):
         self.config = kwargs
 
     @abstractmethod
-    def run(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    def run(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute the agent with a given query (synchronous).
 
@@ -65,7 +65,7 @@ class BaseAgent(ABC):
         """
         ...
 
-    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute the agent with a given query (asynchronous).
 
@@ -73,6 +73,7 @@ class BaseAgent(ABC):
         Override for native async (e.g., ReActAgent).
         """
         import asyncio
+
         return await asyncio.to_thread(self.run, query, **kwargs)
 
     def _validate_state(self, state: AgentState) -> bool:
@@ -82,8 +83,8 @@ class BaseAgent(ABC):
     def _update_state(
         self,
         state: AgentState,
-        result: Optional[str] = None,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        result: str | None = None,
+        tool_calls: list[dict[str, Any]] | None = None,
         **metadata: Any,
     ) -> AgentState:
         """Update agent state."""

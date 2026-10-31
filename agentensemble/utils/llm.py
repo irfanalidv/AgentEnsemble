@@ -5,7 +5,7 @@ Provides helper functions for initializing Mistral AI models.
 """
 
 import os
-from typing import Optional
+
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -13,6 +13,7 @@ load_dotenv()
 
 try:
     from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+
     MISTRAL_AVAILABLE = True
 except ImportError:
     MISTRAL_AVAILABLE = False
@@ -42,7 +43,7 @@ def get_mistral_api_key() -> str:
 def get_mistral_model(
     model: str = "mistral-large-latest",
     temperature: float = 0.7,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> ChatMistralAI:
     """
     Initialize Mistral chat model.
@@ -61,8 +62,7 @@ def get_mistral_model(
     """
     if not MISTRAL_AVAILABLE:
         raise ImportError(
-            "langchain-mistralai is required. "
-            "Install with: pip install langchain-mistralai"
+            "langchain-mistralai is required. Install with: pip install langchain-mistralai"
         )
 
     if not api_key:
@@ -77,7 +77,7 @@ def get_mistral_model(
 
 def get_mistral_embeddings(
     model: str = "mistral-embed",
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MistralAIEmbeddings:
     """
     Initialize Mistral embeddings model.
@@ -95,8 +95,7 @@ def get_mistral_embeddings(
     """
     if not MISTRAL_AVAILABLE:
         raise ImportError(
-            "langchain-mistralai is required. "
-            "Install with: pip install langchain-mistralai"
+            "langchain-mistralai is required. Install with: pip install langchain-mistralai"
         )
 
     if not api_key:
@@ -106,4 +105,3 @@ def get_mistral_embeddings(
         model=model,
         mistral_api_key=api_key,
     )
-

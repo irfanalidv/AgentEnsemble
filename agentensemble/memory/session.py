@@ -5,7 +5,7 @@ Stores conversation history for multi-turn agent interactions.
 Research: Memoria, VoltAgent, Redis Agent Memory - 40-60% token savings.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -18,11 +18,11 @@ class Session(Protocol):
 
     session_id: str
 
-    def get_messages(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_messages(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Retrieve conversation history. Latest N if limit set."""
         ...
 
-    def add_messages(self, messages: List[Dict[str, Any]]) -> None:
+    def add_messages(self, messages: list[dict[str, Any]]) -> None:
         """Append messages to history."""
         ...
 
@@ -40,14 +40,14 @@ class InMemorySession:
 
     def __init__(self, session_id: str = "default"):
         self.session_id = session_id
-        self._messages: List[Dict[str, Any]] = []
+        self._messages: list[dict[str, Any]] = []
 
-    def get_messages(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_messages(self, limit: int | None = None) -> list[dict[str, Any]]:
         if limit is None:
             return list(self._messages)
         return list(self._messages[-limit:])
 
-    def add_messages(self, messages: List[Dict[str, Any]]) -> None:
+    def add_messages(self, messages: list[dict[str, Any]]) -> None:
         self._messages.extend(messages)
 
     def clear(self) -> None:

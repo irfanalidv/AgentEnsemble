@@ -9,15 +9,16 @@ and agent logic. Enables multi-provider support without vendor lock-in.
 """
 
 from agentensemble.llm.interface import (
-    LLMProvider,
     LLMMessage,
-    ToolCall,
+    LLMProvider,
     LLMResponse,
+    ToolCall,
     ToolSchema,
 )
 
 try:
     from agentensemble.llm.mistral_provider import MistralLLMProvider
+
     MISTRAL_AVAILABLE = True
 except ImportError:
     MISTRAL_AVAILABLE = False

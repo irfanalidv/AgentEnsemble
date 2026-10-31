@@ -6,12 +6,12 @@ Uses StateGraphAgent (no API key) for demo; swap for ReActAgent + SearchTool for
 """
 
 from agentensemble import (
+    Ensemble,
     PlannerAgent,
     RouterAgent,
-    StateGraphAgent,
-    Ensemble,
-    Runner,
     RunConfig,
+    Runner,
+    StateGraphAgent,
 )
 
 

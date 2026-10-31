@@ -1,9 +1,7 @@
 """Tests for agent implementations."""
 
-import pytest
-
-from agentensemble.agents import ReActAgent, StateGraphAgent, RAGAgent, HybridAgent
-from agentensemble.agents.base import BaseAgent, AgentState
+from agentensemble.agents import HybridAgent, RAGAgent, ReActAgent
+from agentensemble.agents.base import AgentState
 from agentensemble.tools import function_tool
 
 
@@ -84,7 +82,9 @@ class TestHybridAgent:
             async def agenerate(self, messages, tools=None, tool_choice=None, **kwargs):
                 return LLMResponse(
                     content=None,
-                    tool_calls=[ToolCall(id="1", name="choose_next_action", arguments={"action": "ANSWER"})],
+                    tool_calls=[
+                        ToolCall(id="1", name="choose_next_action", arguments={"action": "ANSWER"})
+                    ],
                 )
 
         agent = HybridAgent(name="hybrid", tools=[], max_iterations=2, llm=MockLLM())

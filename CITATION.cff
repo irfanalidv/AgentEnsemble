@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "agentensemble"
+abstract: "Build, orchestrate, trace, and test multi-agent LLM systems in Python."
+authors:
+  - family-names: Ali
+    given-names: Irfan
+version: "0.4.0"
+date-released: "2026-10-31"
+license: MIT
+repository-code: "https://github.com/irfanalidv/AgentEnsemble"
+url: "https://pypi.org/project/agentensemble/"

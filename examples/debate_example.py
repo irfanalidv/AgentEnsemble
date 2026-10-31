@@ -6,6 +6,7 @@ Use case: Math problems, reasoning tasks where consensus improves accuracy.
 """
 
 import asyncio
+
 from dotenv import load_dotenv
 
 load_dotenv()

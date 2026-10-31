@@ -6,6 +6,7 @@ Use case: Show "Thinking...", "Searching...", etc. in UI.
 """
 
 import asyncio
+
 from dotenv import load_dotenv
 
 load_dotenv()

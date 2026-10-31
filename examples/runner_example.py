@@ -5,13 +5,16 @@ Demonstrates Runner.run(), Runner.arun(), RunConfig, and RunHooks.
 Uses StateGraphAgent (no API key required).
 """
 
-from agentensemble import Runner, RunConfig, RunHooks, StateGraphAgent
+from agentensemble import RunConfig, RunHooks, Runner, StateGraphAgent
 
 
 def main():
     # Simple graph: start -> end
     def start_node(state):
-        return {"context": {**state.context, "started": True}, "result": f"Processed: {state.query}"}
+        return {
+            "context": {**state.context, "started": True},
+            "result": f"Processed: {state.query}",
+        }
 
     agent = StateGraphAgent(
         name="demo",

@@ -5,8 +5,8 @@ Simple, practical examples for common agent tasks.
 """
 
 from agentensemble import HybridAgent, ReActAgent
-from agentensemble.tools import SearchTool
 from agentensemble.orchestration import Ensemble
+from agentensemble.tools import SearchTool
 
 
 def example_web_search():
@@ -23,7 +23,7 @@ def example_web_search():
 
     # Search for information
     result = agent.run("What is Python programming?")
-    print(f"Query: 'What is Python programming?'")
+    print("Query: 'What is Python programming?'")
     print(f"Result: {result['result'][:200]}...")
     print(f"Iterations: {result['metadata']['iterations']}")
     print()
@@ -40,7 +40,7 @@ def example_research_agent():
 
     # Research a topic
     result = agent.run("Latest developments in AI agents")
-    print(f"Query: 'Latest developments in AI agents'")
+    print("Query: 'Latest developments in AI agents'")
     print(f"Result: {result['result'][:200]}...")
     print(f"Metadata: {result['metadata']}")
     print()
@@ -65,7 +65,7 @@ def example_multi_agent_research():
     # Execute research task
     result = ensemble.perform(task="Research Python programming language", data={"topic": "Python"})
 
-    print(f"Task: 'Research Python programming language'")
+    print("Task: 'Research Python programming language'")
     print(f"Agents used: {result.get('agents_used', [])}")
     print(f"Results from {len(result.get('results', {}))} agents")
     print()

@@ -15,6 +15,7 @@ Run:
 
 import asyncio
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,20 +29,20 @@ if not SERPER:
     print("⚠️  SERPER_API_KEY not found in .env - SearchTool will use DuckDuckGo fallback")
 
 from agentensemble import (
-    ReActAgent,
-    HybridAgent,
-    StateGraphAgent,
     Ensemble,
-    RouterAgent,
+    HybridAgent,
+    InMemorySession,
     PlannerAgent,
-    WorkflowGraph,
-    Runner,
+    ReActAgent,
+    RouterAgent,
     RunConfig,
     RunHooks,
+    Runner,
     SearchTool,
-    InMemorySession,
+    StateGraphAgent,
+    WorkflowGraph,
 )
-from agentensemble.orchestration import SwarmOrchestrator, PipelineOrchestrator, DebateOrchestrator
+from agentensemble.orchestration import DebateOrchestrator, PipelineOrchestrator, SwarmOrchestrator
 from agentensemble.tools import function_tool
 
 
@@ -53,7 +54,7 @@ async def demo_react_search():
 
     agent = ReActAgent(name="research", tools=[SearchTool()], max_iterations=5)
     result = await agent.arun("Who won the 2024 Nobel Prize in Physics?")
-    print(f"Query: Who won the 2024 Nobel Prize in Physics?")
+    print("Query: Who won the 2024 Nobel Prize in Physics?")
     print(f"Result: {result['result'][:500]}...")
     print(f"Metadata: {result['metadata']}")
 
@@ -71,7 +72,7 @@ async def demo_custom_tool():
 
     agent = ReActAgent(name="assistant", tools=[SearchTool(), get_weather], max_iterations=4)
     result = await agent.arun("What is the weather in Paris? Use the weather tool.")
-    print(f"Query: What is the weather in Paris?")
+    print("Query: What is the weather in Paris?")
     print(f"Result: {result['result'][:400]}...")
     print(f"Tool calls: {result['metadata'].get('tool_calls', 0)}")
 
@@ -84,7 +85,7 @@ async def demo_hybrid():
 
     agent = HybridAgent(name="hybrid", tools=[SearchTool()], max_iterations=5)
     result = await agent.arun("What are the key trends in AI agents in 2024?")
-    print(f"Query: What are the key trends in AI agents in 2024?")
+    print("Query: What are the key trends in AI agents in 2024?")
     print(f"Result: {result['result'][:500]}...")
     print(f"Actions taken: {result['metadata'].get('actions_taken', [])}")
 
@@ -103,7 +104,7 @@ async def demo_swarm():
         task="What is the capital of France?",
         data={"query": "capital of France"},
     )
-    print(f"Task: What is the capital of France?")
+    print("Task: What is the capital of France?")
     print(f"Agents used: {result['agents_used']}")
     for name, r in result["results"].items():
         print(f"  {name}: {r['result'][:120]}...")
@@ -123,7 +124,7 @@ async def demo_pipeline():
         task="Summarize the top 3 AI breakthroughs in 2024 in 2 sentences each",
         data={"query": "AI breakthroughs 2024"},
     )
-    print(f"Task: Summarize top 3 AI breakthroughs in 2024")
+    print("Task: Summarize top 3 AI breakthroughs in 2024")
     print(f"Agents used: {result['agents_used']}")
     final = result.get("final_result", {}).get("previous_result", "")
     print(f"Final: {final[:400]}...")
@@ -141,7 +142,7 @@ async def demo_debate():
 
     debate = DebateOrchestrator(solvers=[solver1, solver2], aggregator=aggregator, rounds=2)
     result = await debate.adebate("What is 15 * 7?")
-    print(f"Problem: What is 15 * 7?")
+    print("Problem: What is 15 * 7?")
     print(f"Proposals: {result.get('proposals', [])}")
     print(f"Final answer: {result['result']}")
 
@@ -162,7 +163,7 @@ async def demo_router():
         router=router,
     )
     result = await ensemble.aperform("What are the latest developments in quantum computing?")
-    print(f"Task: Latest developments in quantum computing")
+    print("Task: Latest developments in quantum computing")
     for name, r in result.get("results", {}).items():
         print(f"  Routed to {name}: {r.get('result', '')[:150]}...")
         if r.get("metadata", {}).get("routed_to"):
@@ -183,7 +184,7 @@ async def demo_planner():
 
     planner = PlannerAgent(executor=executor, max_subtasks=3)
     result = await planner.arun("Research and compare LangGraph vs CrewAI")
-    print(f"Task: Research and compare LangGraph vs CrewAI")
+    print("Task: Research and compare LangGraph vs CrewAI")
     print(f"Subtasks: {result['metadata'].get('subtasks', [])}")
     print(f"Result: {result['result'][:300]}...")
 
@@ -199,7 +200,10 @@ def demo_graph():
 
     def search(s):
         q = s.get("query", "")
-        return {"context": {**s.get("context", {}), "found": f"Results for: {q}"}, "current_node": "summarize"}
+        return {
+            "context": {**s.get("context", {}), "found": f"Results for: {q}"},
+            "current_node": "summarize",
+        }
 
     def summarize(s):
         ctx = s.get("context", {})
@@ -217,7 +221,7 @@ def demo_graph():
         .add_edge("summarize", "end")
     )
     result = graph.run("What is multi-agent AI?")
-    print(f"Query: What is multi-agent AI?")
+    print("Query: What is multi-agent AI?")
     print(f"Result: {result['result']}")
 
 
@@ -245,14 +249,14 @@ async def demo_runner_memory():
 
     config = RunConfig(hooks=RunHooks(on_start=on_start, on_end=on_end))
     result = await Runner.arun(agent, "What is the capital of Japan?", config=config)
-    print(f"User: What is the capital of Japan?")
+    print("User: What is the capital of Japan?")
     print(f"Agent: {result['result'][:200]}...")
     print(f"Hooks fired: {events}")
     print(f"Session messages: {len(session.get_messages())}")
 
     # Turn 2 - agent remembers context
     result2 = await Runner.arun(agent, "What about its population?", config=config)
-    print(f"\nUser: What about its population?")
+    print("\nUser: What about its population?")
     print(f"Agent: {result2['result'][:200]}...")
     print(f"Session messages: {len(session.get_messages())}")
 

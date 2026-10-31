@@ -2,8 +2,8 @@
 
 import pytest
 
+from agentensemble.agents import RAGAgent
 from agentensemble.testing import AgentComparison, Benchmark, Metrics
-from agentensemble.agents import StateGraphAgent, RAGAgent
 
 
 class TestAgentComparison:

@@ -5,8 +5,9 @@ Unified execution with RunConfig, hooks, and error handling.
 """
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 from agentensemble.memory import Session
 
@@ -20,30 +21,30 @@ class AgentProtocol(Protocol):
 
     name: str
 
-    def run(self, query: str, **kwargs: Any) -> Dict[str, Any]: ...
-    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]: ...
+    def run(self, query: str, **kwargs: Any) -> dict[str, Any]: ...
+    async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]: ...
 
 
 @dataclass
 class RunHooks:
     """Lifecycle hooks for run execution."""
 
-    on_start: Optional[Callable[[str, Dict[str, Any]], None]] = None
-    on_end: Optional[Callable[[Dict[str, Any]], None]] = None
-    on_error: Optional[Callable[[Exception], None]] = None
+    on_start: Callable[[str, dict[str, Any]], None] | None = None
+    on_end: Callable[[dict[str, Any]], None] | None = None
+    on_error: Callable[[Exception], None] | None = None
 
 
 @dataclass
 class RunConfig:
     """Configuration for Runner execution."""
 
-    session: Optional[Session] = None
-    hooks: Optional[RunHooks] = None
+    session: Session | None = None
+    hooks: RunHooks | None = None
     trace_hooks: Optional["TraceHooks"] = None
-    interrupt_before_tools: Optional[List[str]] = None
+    interrupt_before_tools: list[str] | None = None
     max_retries: int = 0
     retry_on: tuple = (Exception,)  # Exception types to retry (e.g. (RateLimitError, TimeoutError))
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class Runner:
@@ -57,9 +58,9 @@ class Runner:
     def run(
         agent: AgentProtocol,
         input: str,
-        config: Optional[RunConfig] = None,
+        config: RunConfig | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute agent (sync).
 
@@ -78,9 +79,9 @@ class Runner:
     async def arun(
         agent: AgentProtocol,
         input: str,
-        config: Optional[RunConfig] = None,
+        config: RunConfig | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute agent (async).
 
@@ -104,7 +105,7 @@ class Runner:
         if config.hooks and config.hooks.on_start:
             config.hooks.on_start(input, merged_kwargs)
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(config.max_retries + 1):
             try:
                 result = await agent.arun(input, **merged_kwargs)

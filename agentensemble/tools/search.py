@@ -6,7 +6,7 @@ Defaults to Serper API if API key is available, otherwise falls back to DuckDuck
 """
 
 import os
-from typing import Any, Optional
+
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -14,8 +14,8 @@ load_dotenv()
 
 try:
     from langchain_community.tools import (
-        DuckDuckGoSearchRun,
         DuckDuckGoSearchResults,
+        DuckDuckGoSearchRun,
     )
 
     # Optional: Serper API (requires API key) - only import if needed
@@ -39,6 +39,9 @@ except ImportError:
     Tool = None
 
 
+_PROVIDERS = ("serper", "duckduckgo", "duckduckgo_results")
+
+
 class SearchTool:
     """
     Web search tool for agents using LangChain community tools.
@@ -52,7 +55,7 @@ class SearchTool:
     - DuckDuckGo Results (structured results, free)
     """
 
-    def __init__(self, provider: Optional[str] = None, api_key: Optional[str] = None, **kwargs):
+    def __init__(self, provider: str | None = None, api_key: str | None = None, **kwargs):
         """
         Initialize search tool.
 
@@ -75,14 +78,26 @@ class SearchTool:
             else:
                 provider = "duckduckgo"
 
+        if provider not in _PROVIDERS:
+            raise ValueError(f"Unknown provider: {provider!r}. Supported: {', '.join(_PROVIDERS)}")
         self.provider = provider
         # Use provided api_key or get from environment
         self.api_key = api_key or os.getenv("SERPER_API_KEY")
-        self._tool: Optional[BaseTool] = None
-        self._initialize_tool()
+        self._tool: BaseTool | None = None
+        # The underlying LangChain tool is created lazily on first use, so a SearchTool can be
+        # registered/inspected without the optional search backend installed.
 
     def _initialize_tool(self) -> None:
         """Initialize the underlying LangChain tool"""
+        try:
+            self._build_tool()
+        except ImportError as exc:
+            raise ImportError(
+                f"SearchTool provider {self.provider!r} needs the optional search dependencies. "
+                "Install with: pip install 'agentensemble[search]'"
+            ) from exc
+
+    def _build_tool(self) -> None:
         if not LANGCHAIN_AVAILABLE:
             raise ImportError(
                 "langchain-community is required for SearchTool. "

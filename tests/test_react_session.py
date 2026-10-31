@@ -1,7 +1,5 @@
 """Tests for ReActAgent session integration."""
 
-import pytest
-
 from agentensemble.agents import ReActAgent
 from agentensemble.memory import InMemorySession
 
@@ -22,10 +20,12 @@ class TestReActAgentSession:
 
     def test_session_to_messages_with_history(self):
         session = InMemorySession("test")
-        session.add_messages([
-            {"role": "user", "content": "hi"},
-            {"role": "assistant", "content": "hello"},
-        ])
+        session.add_messages(
+            [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ]
+        )
         agent = ReActAgent(name="t", tools=[], session=session)
         msgs = agent._session_to_messages()
         assert len(msgs) == 2

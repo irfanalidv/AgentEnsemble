@@ -11,10 +11,9 @@ Research basis:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # -----------------------------------------------------------------------------
 # Message & Response Models
@@ -25,11 +24,11 @@ class LLMMessage(BaseModel):
     """Standardized message format across providers."""
 
     role: str  # "system" | "user" | "assistant" | "tool"
-    content: Union[str, List[Dict[str, Any]]] = ""
+    content: str | list[dict[str, Any]] = ""
     """Content: string for text, or list for multimodal (e.g., tool results)."""
-    tool_call_id: Optional[str] = None
+    tool_call_id: str | None = None
     """Required for tool role: links result to specific tool call."""
-    tool_calls: Optional[List["ToolCall"]] = None
+    tool_calls: list["ToolCall"] | None = None
     """For assistant role: tool invocations when model requests function calls."""
 
 
@@ -38,17 +37,17 @@ class ToolCall(BaseModel):
 
     id: str = ""
     name: str
-    arguments: Dict[str, Any] = Field(default_factory=dict)
+    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMResponse(BaseModel):
     """Unified response from any LLM provider."""
 
-    content: Optional[str] = None
-    tool_calls: List[ToolCall] = Field(default_factory=list)
+    content: str | None = None
+    tool_calls: list[ToolCall] = Field(default_factory=list)
     finish_reason: str = "stop"
     """One of: stop, tool_calls, length, content_filter."""
-    usage: Optional[Dict[str, int]] = None
+    usage: dict[str, int] | None = None
     """Token usage: input_tokens, output_tokens."""
 
 
@@ -57,7 +56,7 @@ class ToolSchema(BaseModel):
 
     name: str
     description: str
-    parameters: Dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
     """JSON Schema for parameters."""
 
 
@@ -79,9 +78,9 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate(
         self,
-        messages: List[LLMMessage],
-        tools: Optional[List[ToolSchema]] = None,
-        tool_choice: Optional[str] = None,
+        messages: list[LLMMessage],
+        tools: list[ToolSchema] | None = None,
+        tool_choice: str | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
@@ -101,9 +100,9 @@ class LLMProvider(ABC):
     @abstractmethod
     async def agenerate(
         self,
-        messages: List[LLMMessage],
-        tools: Optional[List[ToolSchema]] = None,
-        tool_choice: Optional[str] = None,
+        messages: list[LLMMessage],
+        tools: list[ToolSchema] | None = None,
+        tool_choice: str | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """Async generation. Same contract as generate."""
@@ -111,7 +110,7 @@ class LLMProvider(ABC):
 
     def get_react_system_prompt(
         self,
-        tools: List[ToolSchema],
+        tools: list[ToolSchema],
         max_iterations: int,
     ) -> str:
         """
@@ -121,9 +120,7 @@ class LLMProvider(ABC):
         - ReAct: Synergizing Reasoning and Acting (Yao et al., 2022)
         - Tool calling over THOUGHT/ACTION text parsing (LangChain 2024)
         """
-        tool_descriptions = "\n".join(
-            f"- {t.name}: {t.description}" for t in tools
-        )
+        tool_descriptions = "\n".join(f"- {t.name}: {t.description}" for t in tools)
         return f"""You are a helpful assistant that uses tools to answer questions accurately.
 
 ## Your Process (ReAct Pattern)

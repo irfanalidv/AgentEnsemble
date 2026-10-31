@@ -1,8 +1,6 @@
 """Tests for tracing and observability."""
 
-import pytest
-
-from agentensemble.tracing import TraceHooks, TraceEvent, TraceEventType, estimate_cost
+from agentensemble.tracing import TraceEvent, TraceEventType, TraceHooks, estimate_cost
 
 
 class TestEstimateCost:

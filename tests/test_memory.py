@@ -3,9 +3,7 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
-from agentensemble.memory import InMemorySession, Session, SQLiteSession
+from agentensemble.memory import InMemorySession, SQLiteSession
 
 
 class TestInMemorySession:
@@ -18,11 +16,13 @@ class TestInMemorySession:
         assert msgs[0]["content"] == "hi"
 
     def test_get_messages_with_limit(self, in_memory_session):
-        in_memory_session.add_messages([
-            {"role": "user", "content": "1"},
-            {"role": "assistant", "content": "2"},
-            {"role": "user", "content": "3"},
-        ])
+        in_memory_session.add_messages(
+            [
+                {"role": "user", "content": "1"},
+                {"role": "assistant", "content": "2"},
+                {"role": "user", "content": "3"},
+            ]
+        )
         msgs = in_memory_session.get_messages(limit=2)
         assert len(msgs) == 2
         assert msgs[0]["content"] == "2"

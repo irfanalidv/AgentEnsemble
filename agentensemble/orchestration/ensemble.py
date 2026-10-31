@@ -6,7 +6,7 @@ Supports sync perform() and async aperform() for parallel execution.
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 
@@ -14,19 +14,19 @@ from agentensemble.agents.base import BaseAgent
 class Ensemble:
     """
     Ensemble orchestrator for coordinating multiple agents.
-    
+
     Supports different coordination modes:
     - supervisor: Central coordinator manages agents
     - swarm: Decentralized agent collaboration
     - pipeline: Sequential agent workflows
     """
-    
+
     def __init__(
         self,
-        agents: Dict[str, BaseAgent],
+        agents: dict[str, BaseAgent],
         conductor: str = "supervisor",
-        router: Optional[Any] = None,
-        **kwargs
+        router: Any | None = None,
+        **kwargs,
     ):
         """
         Initialize ensemble.
@@ -41,8 +41,8 @@ class Ensemble:
         self.conductor = conductor
         self.router = router
         self.config = kwargs
-    
-    def perform(self, task: str, data: Any = None, **kwargs) -> Dict[str, Any]:
+
+    def perform(self, task: str, data: Any = None, **kwargs) -> dict[str, Any]:
         """
         Execute ensemble of agents on a task (synchronous).
 
@@ -56,7 +56,7 @@ class Ensemble:
         """
         return asyncio.run(self.aperform(task, data, **kwargs))
 
-    async def aperform(self, task: str, data: Any = None, **kwargs) -> Dict[str, Any]:
+    async def aperform(self, task: str, data: Any = None, **kwargs) -> dict[str, Any]:
         """
         Execute ensemble of agents on a task (asynchronous).
 
@@ -70,22 +70,12 @@ class Ensemble:
             return await self._pipeline_coordinate_async(task, data, **kwargs)
         else:
             raise ValueError(f"Unknown conductor mode: {self.conductor}")
-    
-    def _supervisor_coordinate(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+
+    def _supervisor_coordinate(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Supervisor pattern: Central agent coordinates others (sync)."""
         return asyncio.run(self._supervisor_coordinate_async(task, data, **kwargs))
 
-    async def _supervisor_coordinate_async(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _supervisor_coordinate_async(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Supervisor pattern: Central agent coordinates others."""
         results = {}
         agent_order = await self._determine_agent_order_async(task)
@@ -93,36 +83,31 @@ class Ensemble:
         for agent_name in agent_order:
             if agent_name in self.agents:
                 agent = self.agents[agent_name]
-                context = data if isinstance(data, dict) else {"query": str(data), "original_data": data}
+                context = (
+                    data if isinstance(data, dict) else {"query": str(data), "original_data": data}
+                )
                 result = await agent.arun(task, context=context, **kwargs)
                 results[agent_name] = result
-                data = {"previous_result": result.get("result", ""), "metadata": result.get("metadata", {})}
+                data = {
+                    "previous_result": result.get("result", ""),
+                    "metadata": result.get("metadata", {}),
+                }
 
         return {
             "results": results,
             "conductor": "supervisor",
             "agents_used": agent_order,
         }
-    
-    def _swarm_coordinate(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+
+    def _swarm_coordinate(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Swarm pattern (sync wrapper)."""
         return asyncio.run(self._swarm_coordinate_async(task, data, **kwargs))
 
-    async def _swarm_coordinate_async(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _swarm_coordinate_async(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Swarm pattern: Agents run in parallel via asyncio.gather."""
         context = data if isinstance(data, dict) else {"query": str(data), "original_data": data}
 
-        async def run_agent(name: str, agent: BaseAgent) -> tuple[str, Dict[str, Any]]:
+        async def run_agent(name: str, agent: BaseAgent) -> tuple[str, dict[str, Any]]:
             result = await agent.arun(task, context=context, **kwargs)
             return (name, result)
 
@@ -135,31 +120,28 @@ class Ensemble:
             "conductor": "swarm",
             "agents_used": list(self.agents.keys()),
         }
-    
-    def _pipeline_coordinate(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+
+    def _pipeline_coordinate(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Pipeline pattern (sync wrapper)."""
         return asyncio.run(self._pipeline_coordinate_async(task, data, **kwargs))
 
-    async def _pipeline_coordinate_async(
-        self,
-        task: str,
-        data: Any,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _pipeline_coordinate_async(self, task: str, data: Any, **kwargs) -> dict[str, Any]:
         """Pipeline pattern: Sequential agent execution."""
         results = {}
         current_data = data
 
         for agent_name, agent in self.agents.items():
-            context = current_data if isinstance(current_data, dict) else {"query": str(current_data), "original_data": current_data}
+            context = (
+                current_data
+                if isinstance(current_data, dict)
+                else {"query": str(current_data), "original_data": current_data}
+            )
             result = await agent.arun(task, context=context, **kwargs)
             results[agent_name] = result
-            current_data = {"previous_result": result.get("result", ""), "metadata": result.get("metadata", {})}
+            current_data = {
+                "previous_result": result.get("result", ""),
+                "metadata": result.get("metadata", {}),
+            }
 
         return {
             "results": results,
@@ -167,12 +149,11 @@ class Ensemble:
             "agents_used": list(self.agents.keys()),
             "final_result": current_data,
         }
-    
-    async def _determine_agent_order_async(self, task: str) -> List[str]:
+
+    async def _determine_agent_order_async(self, task: str) -> list[str]:
         """Determine agent order. Uses RouterAgent.route_only when provided."""
         if self.router and hasattr(self.router, "route_only"):
             name = await self.router.route_only(task)
             if name and name in self.agents:
                 return [name]
         return list(self.agents.keys())
-

@@ -5,14 +5,16 @@ Demonstrates structured output using LangChain's structured output feature.
 Based on: https://docs.langchain.com/oss/python/langchain/structured-output
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
 
 # Check if structured output is available
 try:
+    from langchain.agents.structured_output import ProviderStrategy, ToolStrategy
+
     from agentensemble.agents import StructuredAgent
     from agentensemble.tools import SearchTool
-    from langchain.agents.structured_output import ToolStrategy, ProviderStrategy
 
     STRUCTURED_AVAILABLE = True
     TOOL_STRATEGY_AVAILABLE = True
@@ -54,7 +56,7 @@ def example_structured_output_pydantic():
     result = agent.run("Extract contact info from: John Doe, [email protected], (555) 123-4567")
 
     print(f"\nNatural language result: {result['result']}")
-    print(f"\nStructured response:")
+    print("\nStructured response:")
     print(result["structured_response"])
     print()
 
@@ -73,7 +75,7 @@ def example_structured_output_tool_strategy():
     class ProductReview(BaseModel):
         """Analysis of a product review."""
 
-        rating: Optional[int] = Field(
+        rating: int | None = Field(
             description="The rating of the product", ge=1, le=5, default=None
         )
         sentiment: Literal["positive", "negative", "neutral"] = Field(
@@ -101,7 +103,7 @@ def example_structured_output_tool_strategy():
     )
 
     print(f"\nNatural language result: {result['result'][:200]}...")
-    print(f"\nStructured response:")
+    print("\nStructured response:")
     print(f"  Rating: {result['structured_response'].rating}")
     print(f"  Sentiment: {result['structured_response'].sentiment}")
     print(f"  Key points: {result['structured_response'].key_points}")
@@ -142,7 +144,7 @@ def example_structured_output_with_search():
 
     print(f"\nNatural language result: {result['result'][:200]}...")
     if result.get("structured_response"):
-        print(f"\nStructured response:")
+        print("\nStructured response:")
         print(f"  Topic: {result['structured_response'].topic}")
         print(f"  Key findings: {result['structured_response'].key_findings}")
         print(f"  Sources: {result['structured_response'].sources_count}")

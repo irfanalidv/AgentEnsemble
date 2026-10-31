@@ -6,7 +6,7 @@ Research: AutoGen, CrewAI - effective for math/reasoning (e.g., GSM8K).
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 
@@ -24,7 +24,7 @@ class DebateOrchestrator:
 
     def __init__(
         self,
-        solvers: List[BaseAgent],
+        solvers: list[BaseAgent],
         aggregator: BaseAgent,
         rounds: int = 2,
         **kwargs: Any,
@@ -43,11 +43,11 @@ class DebateOrchestrator:
         self.rounds = rounds
         self.config = kwargs
 
-    def debate(self, problem: str, **kwargs: Any) -> Dict[str, Any]:
+    def debate(self, problem: str, **kwargs: Any) -> dict[str, Any]:
         """Run debate (sync)."""
         return asyncio.run(self.adebate(problem, **kwargs))
 
-    async def adebate(self, problem: str, **kwargs: Any) -> Dict[str, Any]:
+    async def adebate(self, problem: str, **kwargs: Any) -> dict[str, Any]:
         """Run debate (async)."""
         # Round 0: All solvers propose
         tasks = [solver.arun(problem, **kwargs) for solver in self.solvers]
@@ -67,7 +67,7 @@ class DebateOrchestrator:
                 **context,
                 "round": r,
                 "other_proposals": "\n\n".join(
-                    f"Solver {i+1}: {p}" for i, p in enumerate(proposals)
+                    f"Solver {i + 1}: {p}" for i, p in enumerate(proposals)
                 ),
             }
             tasks = [
@@ -86,7 +86,7 @@ class DebateOrchestrator:
         vote_prompt = (
             f"Problem: {problem}\n\n"
             + "Proposed answers:\n"
-            + "\n\n".join(f"Option {i+1}: {p}" for i, p in enumerate(proposals))
+            + "\n\n".join(f"Option {i + 1}: {p}" for i, p in enumerate(proposals))
             + "\n\nChoose the best answer (or synthesize one)."
         )
         final = await self.aggregator.arun(vote_prompt, **kwargs)

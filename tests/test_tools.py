@@ -1,13 +1,10 @@
 """Tests for tools."""
 
-import pytest
-
 from agentensemble.tools import (
-    function_tool,
     FunctionTool,
-    get_tool_schemas,
-    invoke_tool,
     ToolRegistry,
+    function_tool,
+    get_tool_schemas,
 )
 from agentensemble.tools.search import SearchTool
 
@@ -41,6 +38,7 @@ class TestFunctionTool:
             return x.upper()
 
         import asyncio
+
         result = asyncio.run(sync_fn.arun(x="hello"))
         assert result == "HELLO"
 

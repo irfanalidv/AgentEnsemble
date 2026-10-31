@@ -12,8 +12,8 @@ Usage:
 """
 
 import asyncio
-from functools import wraps
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from agentensemble.llm.interface import ToolSchema
 from agentensemble.tools.protocol import _infer_schema_from_func
@@ -30,8 +30,8 @@ class FunctionTool:
     def __init__(
         self,
         func: Callable[..., Any],
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
     ):
         self._func = func
         self._schema = _infer_schema_from_func(func, name=name, description=description)
@@ -57,8 +57,8 @@ class FunctionTool:
 
 
 def function_tool(
-    name: Optional[str] = None,
-    description: Optional[str] = None,
+    name: str | None = None,
+    description: str | None = None,
 ) -> Callable[[Callable[..., Any]], FunctionTool]:
     """
     Decorator to create a FunctionTool from a Python function.

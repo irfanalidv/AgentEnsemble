@@ -6,13 +6,14 @@ Use case: Search -> Process -> Summarize workflows.
 """
 
 import asyncio
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from agentensemble.agents import ReActAgent
-from agentensemble.tools import SearchTool
 from agentensemble.orchestration import PipelineOrchestrator
+from agentensemble.tools import SearchTool
 
 
 async def main():

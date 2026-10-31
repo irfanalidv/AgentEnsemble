@@ -5,16 +5,16 @@ Adapt existing tools (SearchTool, RAGTool, etc.) to the Tool protocol
 for use with LLM function calling.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from agentensemble.llm.interface import ToolSchema
 
 
 def adapt_to_tool_schema(
     tool: Any,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    param_schema: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    description: str | None = None,
+    param_schema: dict[str, Any] | None = None,
 ) -> ToolSchema:
     """
     Create ToolSchema from a legacy tool (SearchTool, RAGTool, etc.).
@@ -87,7 +87,7 @@ def get_tool_schemas(tools: list) -> list:
     return schemas
 
 
-def _normalize_arguments(tool: Any, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_arguments(tool: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Normalize arguments for legacy tools (e.g., query->question for RAGTool)."""
     args = dict(arguments)
     if tool_name == "rag" and "query" in args and "question" not in args:
@@ -95,7 +95,7 @@ def _normalize_arguments(tool: Any, tool_name: str, arguments: Dict[str, Any]) -
     return args
 
 
-def invoke_tool(tool: Any, name: str, arguments: Dict[str, Any]) -> Any:
+def invoke_tool(tool: Any, name: str, arguments: dict[str, Any]) -> Any:
     """
     Invoke a tool by name with given arguments.
 
@@ -107,12 +107,13 @@ def invoke_tool(tool: Any, name: str, arguments: Dict[str, Any]) -> Any:
     return str(arguments)
 
 
-async def ainvoke_tool(tool: Any, name: str, arguments: Dict[str, Any]) -> Any:
+async def ainvoke_tool(tool: Any, name: str, arguments: dict[str, Any]) -> Any:
     """Async invoke tool."""
     args = _normalize_arguments(tool, name, arguments)
     if hasattr(tool, "arun"):
         return await tool.arun(**args)
     if hasattr(tool, "run"):
         import asyncio
+
         return await asyncio.to_thread(tool.run, **args)
     return str(arguments)

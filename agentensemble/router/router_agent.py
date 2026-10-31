@@ -4,7 +4,7 @@ Router Agent
 LLM-based routing to select the best agent for a given task.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agentensemble.agents.base import BaseAgent
 from agentensemble.core.protocol import AgentProtocol
@@ -12,6 +12,7 @@ from agentensemble.llm.interface import LLMMessage, LLMProvider, ToolSchema
 
 try:
     from agentensemble.llm.mistral_provider import MistralLLMProvider
+
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
@@ -48,8 +49,8 @@ class RouterAgent(BaseAgent):
     def __init__(
         self,
         name: str = "router",
-        agents: Optional[Dict[str, AgentProtocol]] = None,
-        llm: Optional[LLMProvider] = None,
+        agents: dict[str, AgentProtocol] | None = None,
+        llm: LLMProvider | None = None,
         **kwargs: Any,
     ):
         super().__init__(name, tools=[], max_iterations=1, **kwargs)
@@ -61,11 +62,12 @@ class RouterAgent(BaseAgent):
             except (ValueError, ImportError):
                 self.llm = None
 
-    def run(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    def run(self, query: str, **kwargs: Any) -> dict[str, Any]:
         import asyncio
+
         return asyncio.run(self.arun(query, **kwargs))
 
-    async def route_only(self, query: str) -> Optional[str]:
+    async def route_only(self, query: str) -> str | None:
         """Return only the selected agent name, without executing. For Ensemble integration."""
         if not self.llm or not self.agents:
             return next(iter(self.agents.keys()), None) if self.agents else None
@@ -90,7 +92,9 @@ class RouterAgent(BaseAgent):
             },
         )
         messages = [
-            LLMMessage(role="system", content="Select the best agent for this task. Reply with agent name."),
+            LLMMessage(
+                role="system", content="Select the best agent for this task. Reply with agent name."
+            ),
             LLMMessage(role="user", content=f"Query: {query}\n\nAgents: {', '.join(agent_names)}"),
         ]
         response = await self.llm.agenerate(messages, tools=[schema], tool_choice="auto")
@@ -100,7 +104,7 @@ class RouterAgent(BaseAgent):
                 return name
         return agent_names[0]
 
-    async def arun(self, query: str, **kwargs: Any) -> Dict[str, Any]:
+    async def arun(self, query: str, **kwargs: Any) -> dict[str, Any]:
         if not self.llm:
             # Fallback: use first agent
             if self.agents:
@@ -108,9 +112,7 @@ class RouterAgent(BaseAgent):
                 return await agent.arun(query, **kwargs)
             return {"result": "No agents available", "metadata": {"routed_to": None}}
 
-        agent_descriptions = "\n".join(
-            f"- {name}: available" for name in self.agents.keys()
-        )
+        agent_descriptions = "\n".join(f"- {name}: available" for name in self.agents.keys())
         prompt = f"""Query: {query}
 
 Available agents:
